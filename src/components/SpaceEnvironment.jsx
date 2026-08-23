@@ -55,9 +55,10 @@ export function SpaceEnvironment() {
   return (
     <>
       {/* Ambient space lighting */}
-      <ambientLight intensity={0.15} />
-      <directionalLight position={[5, 10, 5]} intensity={0.5} color="#aaccff" />
-      <pointLight position={[0, 0, -30]} intensity={1} color="#4466aa" distance={100} />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 10, 5]} intensity={0.8} color="#aaccff" />
+      <pointLight position={[0, 0, -30]} intensity={1.5} color="#4466aa" distance={100} />
+      <pointLight position={[0, 5, 5]} intensity={0.5} color="#ffffff" distance={20} />
 
       {/* Distant nebula glow */}
       <mesh position={[0, 0, -80]}>

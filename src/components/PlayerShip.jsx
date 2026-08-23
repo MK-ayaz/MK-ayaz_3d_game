@@ -63,25 +63,25 @@ export function PlayerShip({ isPlaying }) {
       {/* Main hull - cone pointing forward (-Z) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <coneGeometry args={[0.5, 1.8, 4]} />
-        <meshStandardMaterial color="#00aaff" metalness={0.8} roughness={0.2} />
+        <meshStandardMaterial color="#00aaff" metalness={0.8} roughness={0.2} emissive="#0044aa" emissiveIntensity={0.3} />
       </mesh>
 
       {/* Cockpit dome - front (-Z) */}
       <mesh position={[0, 0.2, -0.3]}>
         <sphereGeometry args={[0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#66ddff" metalness={0.9} roughness={0.1} transparent opacity={0.7} />
+        <meshStandardMaterial color="#66ddff" metalness={0.9} roughness={0.1} transparent opacity={0.7} emissive="#00aaff" emissiveIntensity={0.5} />
       </mesh>
 
       {/* Left wing */}
       <mesh position={[-0.7, -0.05, 0.1]} rotation={[0, 0, 0.15]}>
         <boxGeometry args={[0.9, 0.06, 0.4]} />
-        <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} />
+        <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} emissive="#003366" emissiveIntensity={0.2} />
       </mesh>
 
       {/* Right wing */}
       <mesh position={[0.7, -0.05, 0.1]} rotation={[0, 0, -0.15]}>
         <boxGeometry args={[0.9, 0.06, 0.4]} />
-        <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} />
+        <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} emissive="#003366" emissiveIntensity={0.2} />
       </mesh>
 
       {/* Engine glow left - back (+Z) */}
@@ -97,7 +97,7 @@ export function PlayerShip({ isPlaying }) {
       </mesh>
 
       {/* Point light on ship */}
-      <pointLight position={[0, 0, 1]} intensity={0.5} color="#ff6600" distance={5} />
+      <pointLight position={[0, 0, 1]} intensity={1} color="#00aaff" distance={8} />
     </group>
   )
 }
