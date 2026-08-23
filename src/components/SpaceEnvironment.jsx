@@ -2,48 +2,52 @@ import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-function Star({ position, size }) {
-  return (
-    <mesh position={position}>
-      <sphereGeometry args={[size, 4, 4]} />
-      <meshBasicMaterial color="#ffffff" />
-    </mesh>
-  )
-}
-
 export function Starfield() {
-  const groupRef = useRef()
+  const meshRef = useRef()
+  const dummy = useMemo(() => new THREE.Object3D(), [])
 
-  const stars = useMemo(() => {
-    const s = []
-    for (let i = 0; i < 500; i++) {
-      s.push({
-        position: [
-          (Math.random() - 0.5) * 100,
-          (Math.random() - 0.5) * 100,
-          (Math.random() - 0.5) * 200 - 50,
-        ],
-        size: Math.random() * 0.15 + 0.02,
-      })
+  const STAR_COUNT = 2000
+
+  const [positions, scales] = useMemo(() => {
+    const positions = []
+    const scales = []
+    for (let i = 0; i < STAR_COUNT; i++) {
+      positions.push(
+        (Math.random() - 0.5) * 100,
+        (Math.random() - 0.5) * 100,
+        (Math.random() - 0.5) * 200 - 50
+      )
+      scales.push(Math.random() * 0.15 + 0.02)
     }
-    return s
+    return [new Float32Array(positions), new Float32Array(scales)]
   }, [])
 
   useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.position.z += delta * 5
-      if (groupRef.current.position.z > 50) {
-        groupRef.current.position.z = 0
+    if (!meshRef.current) return
+
+    // Animate starfield movement
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const idx = i * 3
+      positions[idx + 2] += delta * 5
+      
+      // Reset star when it passes the camera
+      if (positions[idx + 2] > 50) {
+        positions[idx + 2] = -150
       }
+
+      dummy.position.set(positions[idx], positions[idx + 1], positions[idx + 2])
+      dummy.scale.setScalar(scales[i])
+      dummy.updateMatrix()
+      meshRef.current.setMatrixAt(i, dummy.matrix)
     }
+    meshRef.current.instanceMatrix.needsUpdate = true
   })
 
   return (
-    <group ref={groupRef}>
-      {stars.map((star, i) => (
-        <Star key={i} position={star.position} size={star.size} />
-      ))}
-    </group>
+    <instancedMesh ref={meshRef} args={[null, null, STAR_COUNT]}>
+      <sphereGeometry args={[1, 4, 4]} />
+      <meshBasicMaterial color="#ffffff" />
+    </instancedMesh>
   )
 }
 

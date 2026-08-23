@@ -173,6 +173,10 @@ export function GameEntities({ isPlaying }) {
       const playerPos = useGameStore.getState().playerPosition
       if (playerPos) {
         addBullet([playerPos[0], playerPos[1], playerPos[2] - 1.5])
+        // Play shoot sound
+        if (window.__soundManager) {
+          window.__soundManager.playShoot()
+        }
       }
     }
 
@@ -190,6 +194,10 @@ export function GameEntities({ isPlaying }) {
         o.active = false
         useGameStore.getState().takeDamage(15)
         obstaclesChanged = true
+        // Play hit sound
+        if (window.__soundManager) {
+          window.__soundManager.playHit()
+        }
       }
     })
 
@@ -216,6 +224,18 @@ export function GameEntities({ isPlaying }) {
           o.active = false
           b.active = false
           useGameStore.getState().addScore(o.type === 'asteroid' ? 15 : 25)
+          
+          // Trigger explosion effect
+          if (window.__triggerExplosion) {
+            const explosionColor = o.type === 'asteroid' ? '#ffaa00' : '#ff4444'
+            window.__triggerExplosion(o.posRef.current, explosionColor, 25)
+          }
+          
+          // Play explosion sound
+          if (window.__soundManager) {
+            window.__soundManager.playExplosion()
+          }
+          
           obstaclesChanged = true
         }
       })
