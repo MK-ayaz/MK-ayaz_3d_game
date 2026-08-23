@@ -6,6 +6,7 @@ const INITIAL_STATE = {
   wave: 1,
   gameState: 'menu', // 'menu' | 'playing' | 'paused' | 'gameover'
   enemiesDestroyed: 0,
+  playerPosition: [0, 0, 0],
 }
 
 export const useGameStore = create((set, get) => ({
@@ -39,6 +40,8 @@ export const useGameStore = create((set, get) => ({
   nextWave: () => set((state) => ({
     wave: state.wave + 1,
   })),
+
+  setPlayerPosition: (pos) => set({ playerPosition: pos }),
 
   resetGame: () => set({ ...INITIAL_STATE }),
 }))

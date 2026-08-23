@@ -1,21 +1,24 @@
 import React, { useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useGameStore } from '../store'
 
 const PLAYER_SPEED = 15
 const ARENA_BOUNDS_X = 11
 const ARENA_BOUNDS_Y = 6
-const SHOOT_COOLDOWN = 180
 
 export function PlayerShip({ isPlaying }) {
   const groupRef = useRef()
   const posRef = useRef([0, 0, 0])
   const keysRef = useRef({})
-  const lastShotRef = useRef(0)
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       keysRef.current[e.code] = true
+      // Prevent page scrolling
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault()
+      }
     }
     const handleKeyUp = (e) => {
       keysRef.current[e.code] = false
@@ -42,6 +45,9 @@ export function PlayerShip({ isPlaying }) {
     pos[0] = Math.max(-ARENA_BOUNDS_X, Math.min(ARENA_BOUNDS_X, pos[0]))
     pos[1] = Math.max(-ARENA_BOUNDS_Y, Math.min(ARENA_BOUNDS_Y, pos[1]))
 
+    // Store position for GameEntities auto-shoot
+    useGameStore.getState().setPlayerPosition([...pos])
+
     if (groupRef.current) {
       groupRef.current.position.set(...pos)
       // Slight tilt when moving
@@ -50,29 +56,18 @@ export function PlayerShip({ isPlaying }) {
       groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, tiltZ, 5 * delta)
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, tiltX, 5 * delta)
     }
-
-    // Shooting
-    if (keys['Space']) {
-      const now = performance.now()
-      if (now - lastShotRef.current > SHOOT_COOLDOWN) {
-        lastShotRef.current = now
-        if (window.__gameAddBullet) {
-          window.__gameAddBullet([pos[0], pos[1], pos[2] - 1.5])
-        }
-      }
-    }
   })
 
   return (
     <group ref={groupRef} position={[0, 0, 0]}>
-      {/* Main hull */}
+      {/* Main hull - cone pointing forward (-Z) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <coneGeometry args={[0.5, 1.8, 4]} />
         <meshStandardMaterial color="#00aaff" metalness={0.8} roughness={0.2} />
       </mesh>
 
-      {/* Cockpit dome - front */}
-      <mesh position={[0, 0.2, -0.2]}>
+      {/* Cockpit dome - front (-Z) */}
+      <mesh position={[0, 0.2, -0.3]}>
         <sphereGeometry args={[0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color="#66ddff" metalness={0.9} roughness={0.1} transparent opacity={0.7} />
       </mesh>
@@ -89,13 +84,13 @@ export function PlayerShip({ isPlaying }) {
         <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} />
       </mesh>
 
-      {/* Engine glow left - back */}
+      {/* Engine glow left - back (+Z) */}
       <mesh position={[-0.3, -0.05, 0.8]}>
         <sphereGeometry args={[0.1, 8, 8]} />
         <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={4} />
       </mesh>
 
-      {/* Engine glow right - back */}
+      {/* Engine glow right - back (+Z) */}
       <mesh position={[0.3, -0.05, 0.8]}>
         <sphereGeometry args={[0.1, 8, 8]} />
         <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={4} />

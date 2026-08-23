@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState, useCallback } from 'react'
+import React, { useRef, useCallback, useEffect, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '../store'
@@ -6,70 +6,72 @@ import { useGameStore } from '../store'
 const ENEMY_SPEED_BASE = 8
 const ENEMY_SPAWN_DISTANCE = 50
 const ARENA_SIZE = 12
-const BULLET_SPEED = 60
+const BULLET_SPEED = 40
+const SHOOT_COOLDOWN = 180
 
-function Asteroid({ position: initialPos, speed, onHit }) {
+// ─── Shared geometry for asteroids ───
+function createAsteroidGeometry() {
+  const geo = new THREE.IcosahedronGeometry(1, 1)
+  const positions = geo.attributes.position
+  for (let i = 0; i < positions.count; i++) {
+    const offset = 0.8 + Math.random() * 0.4
+    positions.setX(i, positions.getX(i) * offset)
+    positions.setY(i, positions.getY(i) * offset)
+    positions.setZ(i, positions.getZ(i) * offset)
+  }
+  geo.computeVertexNormals()
+  return geo
+}
+
+const asteroidGeometries = Array.from({ length: 20 }, () => createAsteroidGeometry())
+
+// ─── Visual: Bullet ───
+function BulletMesh({ posRef }) {
   const meshRef = useRef()
-  const posRef = useRef([...initialPos])
-  const rotSpeed = useMemo(() => [
-    (Math.random() - 0.5) * 2,
-    (Math.random() - 0.5) * 2,
-    (Math.random() - 0.5) * 2,
-  ], [])
-  const scale = useMemo(() => 0.3 + Math.random() * 0.7, [])
-
-  const geometry = useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(1, 1)
-    const positions = geo.attributes.position
-    for (let i = 0; i < positions.count; i++) {
-      const offset = 0.8 + Math.random() * 0.4
-      positions.setX(i, positions.getX(i) * offset)
-      positions.setY(i, positions.getY(i) * offset)
-      positions.setZ(i, positions.getZ(i) * offset)
+  useFrame(() => {
+    if (meshRef.current && posRef.current) {
+      meshRef.current.position.set(posRef.current[0], posRef.current[1], posRef.current[2])
     }
-    geo.computeVertexNormals()
-    return geo
-  }, [])
+  })
+  return (
+    <mesh ref={meshRef}>
+      <sphereGeometry args={[0.15, 8, 8]} />
+      <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={5} />
+    </mesh>
+  )
+}
 
-  useFrame((_, delta) => {
-    if (meshRef.current) {
-      posRef.current[2] += speed * delta
-      meshRef.current.position.set(...posRef.current)
-      meshRef.current.rotation.x += rotSpeed[0] * delta
-      meshRef.current.rotation.y += rotSpeed[1] * delta
-      meshRef.current.rotation.z += rotSpeed[2] * delta
-
-      if (posRef.current[2] > 10) {
-        onHit()
+// ─── Visual: Asteroid ───
+function AsteroidMesh({ posRef, rotRef, geoIdx, scale }) {
+  const meshRef = useRef()
+  useFrame(() => {
+    if (meshRef.current && posRef.current) {
+      meshRef.current.position.set(posRef.current[0], posRef.current[1], posRef.current[2])
+      if (rotRef.current) {
+        meshRef.current.rotation.set(rotRef.current[0], rotRef.current[1], rotRef.current[2])
       }
     }
   })
-
   return (
-    <mesh ref={meshRef} geometry={geometry} position={initialPos} scale={scale}>
+    <mesh ref={meshRef} geometry={asteroidGeometries[geoIdx % 20]} scale={scale}>
       <meshStandardMaterial color="#888888" roughness={0.9} metalness={0.1} flatShading />
     </mesh>
   )
 }
 
-function EnemyShip({ position: initialPos, speed, onPass }) {
+// ─── Visual: Enemy ───
+function EnemyMesh({ posRef, rotRef }) {
   const groupRef = useRef()
-  const posRef = useRef([...initialPos])
-
-  useFrame((_, delta) => {
-    if (groupRef.current) {
-      posRef.current[2] += speed * delta
-      groupRef.current.position.set(...posRef.current)
-      groupRef.current.rotation.y += 3 * delta
-
-      if (posRef.current[2] > 10) {
-        onPass()
+  useFrame(() => {
+    if (groupRef.current && posRef.current) {
+      groupRef.current.position.set(posRef.current[0], posRef.current[1], posRef.current[2])
+      if (rotRef.current) {
+        groupRef.current.rotation.y = rotRef.current[1]
       }
     }
   })
-
   return (
-    <group ref={groupRef} position={initialPos}>
+    <group ref={groupRef}>
       <mesh>
         <octahedronGeometry args={[0.6, 0]} />
         <meshStandardMaterial color="#ff3333" emissive="#ff0000" emissiveIntensity={0.5} metalness={0.6} roughness={0.3} />
@@ -82,70 +84,52 @@ function EnemyShip({ position: initialPos, speed, onPass }) {
   )
 }
 
-function Bullet({ position: initialPos, onExpire }) {
-  const meshRef = useRef()
-  const posRef = useRef([...initialPos])
-
-  useFrame((_, delta) => {
-    if (meshRef.current) {
-      posRef.current[2] -= BULLET_SPEED * delta
-      meshRef.current.position.set(...posRef.current)
-      if (posRef.current[2] < -55) {
-        onExpire()
-      }
-    }
-  })
-
-  return (
-    <mesh ref={meshRef} position={initialPos}>
-      <sphereGeometry args={[0.12, 8, 8]} />
-      <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={5} />
-    </mesh>
-  )
-}
-
+// ─── Main entity manager ───
 export function GameEntities({ isPlaying }) {
-  const [obstacles, setObstacles] = useState([])
-  const [bullets, setBullets] = useState([])
+  // We store all entity data in a ref and use a render counter to trigger re-renders
+  const entitiesRef = useRef({ obstacles: [], bullets: [] })
   const nextIdRef = useRef(0)
   const lastSpawnRef = useRef(0)
-  const obstaclesRef = useRef(obstacles)
-  const bulletsRef = useRef(bullets)
+  const lastShotRef = useRef(0)
+  const frameCountRef = useRef(0)
 
-  // Keep refs in sync
-  obstaclesRef.current = obstacles
-  bulletsRef.current = bullets
-
-  const wave = useGameStore((s) => s.wave)
-  const addScore = useGameStore((s) => s.addScore)
-  const takeDamage = useGameStore((s) => s.takeDamage)
-  const nextWave = useGameStore((s) => s.nextWave)
-  const enemiesDestroyed = useGameStore((s) => s.enemiesDestroyed)
-
-  const speed = ENEMY_SPEED_BASE + wave * 1.5
-  const spawnInterval = Math.max(0.6, 2.2 - wave * 0.15)
+  // State to trigger re-renders (only when entities are added/removed)
+  const [renderKey, setRenderKey] = useState(0)
 
   const addBullet = useCallback((pos) => {
     const id = nextIdRef.current++
-    setBullets((prev) => [...prev, { id, position: pos }])
+    entitiesRef.current.bullets.push({
+      id,
+      posRef: { current: [...pos] },
+      active: true,
+    })
+    setRenderKey((k) => k + 1)
   }, [])
 
-  // Expose addBullet to PlayerShip via global
-  React.useEffect(() => {
+  // Expose addBullet to PlayerShip
+  useEffect(() => {
     window.__gameAddBullet = addBullet
+    return () => { delete window.__gameAddBullet }
   }, [addBullet])
 
   useFrame(() => {
     if (!isPlaying) return
 
     const now = performance.now()
+    const delta = 1 / 60 // Fixed timestep approximation
+    const ents = entitiesRef.current
 
-    // Wave progression
-    if (enemiesDestroyed > 0 && enemiesDestroyed % (5 + wave * 3) === 0) {
-      nextWave()
+    // ── Wave progression ──
+    const destroyed = useGameStore.getState().enemiesDestroyed
+    const currentWave = useGameStore.getState().wave
+    if (destroyed > 0 && destroyed % (5 + currentWave * 3) === 0) {
+      useGameStore.getState().nextWave()
     }
 
-    // Spawn obstacles
+    // ── Spawn obstacles ──
+    const speed = ENEMY_SPEED_BASE + currentWave * 1.5
+    const spawnInterval = Math.max(0.6, 2.2 - currentWave * 0.15)
+
     if (now - lastSpawnRef.current > spawnInterval * 1000) {
       lastSpawnRef.current = now
       const id = nextIdRef.current++
@@ -153,84 +137,128 @@ export function GameEntities({ isPlaying }) {
       const y = (Math.random() - 0.5) * ARENA_SIZE
       const z = -ENEMY_SPAWN_DISTANCE
       const isAsteroid = Math.random() > 0.45
+      const obsSpeed = speed + Math.random() * 3
 
-      setObstacles((prev) => [
-        ...prev,
-        {
+      if (isAsteroid) {
+        ents.obstacles.push({
           id,
-          position: [x, y, z],
-          speed: speed + Math.random() * 3,
-          type: isAsteroid ? 'asteroid' : 'enemy',
-        },
-      ])
+          posRef: { current: [x, y, z] },
+          rotRef: { current: [0, 0, 0] },
+          rotSpeed: [(Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2],
+          geoIdx: id % 20,
+          scale: 0.3 + Math.random() * 0.7,
+          speed: obsSpeed,
+          type: 'asteroid',
+          active: true,
+        })
+      } else {
+        ents.obstacles.push({
+          id,
+          posRef: { current: [x, y, z] },
+          rotRef: { current: [0, 0, 0] },
+          rotSpeed: [0, 3, 0],
+          geoIdx: -1,
+          scale: 1,
+          speed: obsSpeed,
+          type: 'enemy',
+          active: true,
+        })
+      }
+      setRenderKey((k) => k + 1)
     }
 
-    // Collision detection using refs for fresh data
-    const currentBullets = bulletsRef.current
-    const currentObstacles = obstaclesRef.current
-    const hitObstacles = new Set()
-    const hitBullets = new Set()
+    // ── Auto-shoot from player position ──
+    if (now - lastShotRef.current > SHOOT_COOLDOWN) {
+      lastShotRef.current = now
+      const playerPos = useGameStore.getState().playerPosition
+      if (playerPos) {
+        addBullet([playerPos[0], playerPos[1], playerPos[2] - 1.5])
+      }
+    }
 
-    currentBullets.forEach((b) => {
-      currentObstacles.forEach((o) => {
-        if (hitObstacles.has(o.id) || hitBullets.has(b.id)) return
-        const dx = b.position[0] - o.position[0]
-        const dy = b.position[1] - o.position[1]
-        const dz = b.position[2] - o.position[2]
+    // ── Move obstacles ──
+    let obstaclesChanged = false
+    ents.obstacles.forEach((o) => {
+      if (!o.active) return
+      o.posRef.current[2] += o.speed * delta
+      if (o.rotRef.current) {
+        o.rotRef.current[0] += o.rotSpeed[0] * delta
+        o.rotRef.current[1] += o.rotSpeed[1] * delta
+        o.rotRef.current[2] += o.rotSpeed[2] * delta
+      }
+      if (o.posRef.current[2] > 10) {
+        o.active = false
+        useGameStore.getState().takeDamage(15)
+        obstaclesChanged = true
+      }
+    })
+
+    // ── Move bullets ──
+    ents.bullets.forEach((b) => {
+      if (!b.active) return
+      b.posRef.current[2] -= BULLET_SPEED * delta
+      if (b.posRef.current[2] < -55) {
+        b.active = false
+      }
+    })
+
+    // ── Collision detection ──
+    ents.bullets.forEach((b) => {
+      if (!b.active) return
+      ents.obstacles.forEach((o) => {
+        if (!o.active) return
+        const dx = b.posRef.current[0] - o.posRef.current[0]
+        const dy = b.posRef.current[1] - o.posRef.current[1]
+        const dz = b.posRef.current[2] - o.posRef.current[2]
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-        const hitRadius = o.type === 'asteroid' ? 0.8 : 1.2
+        const hitRadius = o.type === 'asteroid' ? 1.0 : 1.2
         if (dist < hitRadius) {
-          hitObstacles.add(o.id)
-          hitBullets.add(b.id)
-          addScore(o.type === 'asteroid' ? 15 : 25)
+          o.active = false
+          b.active = false
+          useGameStore.getState().addScore(o.type === 'asteroid' ? 15 : 25)
+          obstaclesChanged = true
         }
       })
     })
 
-    if (hitObstacles.size > 0) {
-      setObstacles((prev) => prev.filter((o) => !hitObstacles.has(o.id)))
-    }
-    if (hitBullets.size > 0) {
-      setBullets((prev) => prev.filter((b) => !hitBullets.has(b.id)))
+    // ── Cleanup inactive entities ──
+    const prevObsCount = ents.obstacles.length
+    ents.obstacles = ents.obstacles.filter((o) => o.active)
+    const prevBulCount = ents.bullets.length
+    ents.bullets = ents.bullets.filter((b) => b.active)
+
+    if (
+      ents.obstacles.length !== prevObsCount ||
+      ents.bullets.length !== prevBulCount ||
+      obstaclesChanged
+    ) {
+      setRenderKey((k) => k + 1)
     }
   })
 
-  const removeObstacle = useCallback(
-    (id, wasShot) => {
-      setObstacles((prev) => prev.filter((o) => o.id !== id))
-      if (!wasShot) {
-        takeDamage(15)
-      }
-    },
-    [takeDamage]
-  )
-
-  const expireBullet = useCallback((id) => {
-    setBullets((prev) => prev.filter((b) => b.id !== id))
-  }, [])
+  const ents = entitiesRef.current
 
   return (
     <>
-      {obstacles.map((o) =>
+      {ents.obstacles.map((o) =>
         o.type === 'asteroid' ? (
-          <Asteroid
+          <AsteroidMesh
             key={o.id}
-            position={o.position}
-            speed={o.speed}
-            onHit={() => removeObstacle(o.id, false)}
+            posRef={o.posRef}
+            rotRef={o.rotRef}
+            geoIdx={o.geoIdx}
+            scale={o.scale}
           />
         ) : (
-          <EnemyShip
+          <EnemyMesh
             key={o.id}
-            position={o.position}
-            speed={o.speed}
-            onPass={() => removeObstacle(o.id, false)}
+            posRef={o.posRef}
+            rotRef={o.rotRef}
           />
         )
       )}
-      {bullets.map((b) => (
-        <Bullet key={b.id} position={b.position} onExpire={() => expireBullet(b.id)} />
+      {ents.bullets.map((b) => (
+        <BulletMesh key={b.id} posRef={b.posRef} />
       ))}
     </>
   )
