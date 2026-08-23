@@ -6,6 +6,9 @@ export function GameUI() {
   const health = useGameStore((s) => s.health)
   const wave = useGameStore((s) => s.wave)
   const gameState = useGameStore((s) => s.gameState)
+  const activePowerUp = useGameStore((s) => s.activePowerUp)
+  const powerUpTimer = useGameStore((s) => s.powerUpTimer)
+  const highScore = useGameStore((s) => s.highScore)
   const startGame = useGameStore((s) => s.startGame)
   const resumeGame = useGameStore((s) => s.resumeGame)
   const resetGame = useGameStore((s) => s.resetGame)
@@ -39,6 +42,16 @@ export function GameUI() {
             textShadow: '0 0 10px #00ffff',
           }}>
             SCORE: {score}
+          </div>
+
+          {/* High Score */}
+          <div style={{
+            color: '#ffdd00',
+            fontSize: 16,
+            fontWeight: 'bold',
+            textShadow: '0 0 8px #ffdd00',
+          }}>
+            HIGH: {highScore}
           </div>
 
           {/* Wave */}
@@ -107,6 +120,46 @@ export function GameUI() {
           textAlign: 'center',
         }}>
           WASD / Arrow Keys to move • SPACE to shoot
+        </div>
+      )}
+
+      {/* Active Power-up indicator */}
+      {gameState === 'playing' && activePowerUp && (
+        <div style={{
+          position: 'absolute',
+          top: 20,
+          right: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+        }}>
+          <div style={{
+            color: activePowerUp === 'health' ? '#00ff88' : 
+                  activePowerUp === 'speed' ? '#00ccff' : '#ffaa00',
+            fontSize: 16,
+            fontWeight: 'bold',
+            textShadow: `0 0 10px ${activePowerUp === 'health' ? '#00ff88' : 
+                  activePowerUp === 'speed' ? '#00ccff' : '#ffaa00'}`,
+            marginBottom: 4,
+          }}>
+            {activePowerUp.toUpperCase()} ACTIVE
+          </div>
+          <div style={{
+            width: 100,
+            height: 6,
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${Math.max(0, (powerUpTimer - Date.now()) / 5000 * 100)}%`,
+              height: '100%',
+              background: activePowerUp === 'health' ? '#00ff88' : 
+                       activePowerUp === 'speed' ? '#00ccff' : '#ffaa00',
+              borderRadius: 3,
+              transition: 'width 0.1s linear',
+            }} />
+          </div>
         </div>
       )}
 

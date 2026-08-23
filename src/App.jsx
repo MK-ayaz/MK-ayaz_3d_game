@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import { PlayerShip } from './components/PlayerShip'
 import { GameEntities } from './components/GameEntities'
@@ -7,24 +7,24 @@ import { SpaceEnvironment } from './components/SpaceEnvironment'
 import { GameUI } from './components/GameUI'
 import { ParticleSystem } from './components/ParticleSystem'
 import { SoundSystem } from './components/SoundSystem'
+import { PowerUps } from './components/PowerUps'
 import { useGameStore } from './store'
 
 function CameraShake() {
-  const cameraRef = useRef()
+  const { camera } = useThree()
   const shakeIntensity = useRef(0)
+  const originalPosition = useRef([0, 2, 10])
   
   useFrame((_, delta) => {
-    if (!cameraRef.current) return
-    
     // Decay shake intensity
     shakeIntensity.current *= 0.9
     
     if (shakeIntensity.current > 0.01) {
-      cameraRef.current.position.x = (Math.random() - 0.5) * shakeIntensity.current
-      cameraRef.current.position.y = 2 + (Math.random() - 0.5) * shakeIntensity.current
+      camera.position.x = (Math.random() - 0.5) * shakeIntensity.current
+      camera.position.y = originalPosition.current[1] + (Math.random() - 0.5) * shakeIntensity.current
     } else {
-      cameraRef.current.position.x = 0
-      cameraRef.current.position.y = 2
+      camera.position.x = originalPosition.current[0]
+      camera.position.y = originalPosition.current[1]
     }
   })
   
@@ -36,7 +36,7 @@ function CameraShake() {
     return () => { delete window.__triggerCameraShake }
   }, [])
   
-  return <primitive ref={cameraRef} object={null} />
+  return null
 }
 
 function Scene() {
@@ -47,6 +47,7 @@ function Scene() {
       <CameraShake />
       <SpaceEnvironment />
       <ParticleSystem />
+      <PowerUps isPlaying={isPlaying} />
       <PlayerShip isPlaying={isPlaying} />
       <GameEntities isPlaying={isPlaying} />
     </>

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect, useState } from 'react'
+import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '../store'
@@ -8,6 +8,38 @@ const ENEMY_SPAWN_DISTANCE = 50
 const ARENA_SIZE = 12
 const BULLET_SPEED = 40
 const SHOOT_COOLDOWN = 180
+
+// ─── Shared geometries and materials (optimized) ───
+const bulletGeometry = new THREE.SphereGeometry(0.15, 8, 8)
+const bulletMaterial = new THREE.MeshStandardMaterial({
+  color: '#00ffff',
+  emissive: '#00ffff',
+  emissiveIntensity: 5
+})
+
+const asteroidMaterial = new THREE.MeshStandardMaterial({
+  color: '#888888',
+  roughness: 0.9,
+  metalness: 0.1,
+  flatShading: true
+})
+
+const enemyBodyMaterial = new THREE.MeshStandardMaterial({
+  color: '#ff3333',
+  emissive: '#ff0000',
+  emissiveIntensity: 0.5,
+  metalness: 0.6,
+  roughness: 0.3
+})
+
+const enemyRingMaterial = new THREE.MeshStandardMaterial({
+  color: '#ff6600',
+  emissive: '#ff4400',
+  emissiveIntensity: 2
+})
+
+const enemyBodyGeometry = new THREE.OctahedronGeometry(0.6, 0)
+const enemyRingGeometry = new THREE.TorusGeometry(0.8, 0.05, 8, 16)
 
 // ─── Shared geometry for asteroids ───
 function createAsteroidGeometry() {
@@ -34,10 +66,7 @@ function BulletMesh({ posRef }) {
     }
   })
   return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[0.15, 8, 8]} />
-      <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={5} />
-    </mesh>
+    <mesh ref={meshRef} geometry={bulletGeometry} material={bulletMaterial} />
   )
 }
 
@@ -53,9 +82,7 @@ function AsteroidMesh({ posRef, rotRef, geoIdx, scale }) {
     }
   })
   return (
-    <mesh ref={meshRef} geometry={asteroidGeometries[geoIdx % 20]} scale={scale}>
-      <meshStandardMaterial color="#888888" roughness={0.9} metalness={0.1} flatShading />
-    </mesh>
+    <mesh ref={meshRef} geometry={asteroidGeometries[geoIdx % 20]} material={asteroidMaterial} scale={scale} />
   )
 }
 
@@ -72,14 +99,8 @@ function EnemyMesh({ posRef, rotRef }) {
   })
   return (
     <group ref={groupRef}>
-      <mesh>
-        <octahedronGeometry args={[0.6, 0]} />
-        <meshStandardMaterial color="#ff3333" emissive="#ff0000" emissiveIntensity={0.5} metalness={0.6} roughness={0.3} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.8, 0.05, 8, 16]} />
-        <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={2} />
-      </mesh>
+      <mesh geometry={enemyBodyGeometry} material={enemyBodyMaterial} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} geometry={enemyRingGeometry} material={enemyRingMaterial} />
     </group>
   )
 }
@@ -197,6 +218,10 @@ export function GameEntities({ isPlaying }) {
         // Play hit sound
         if (window.__soundManager) {
           window.__soundManager.playHit()
+        }
+        // Trigger camera shake
+        if (window.__triggerCameraShake) {
+          window.__triggerCameraShake(0.8)
         }
       }
     })
