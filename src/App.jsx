@@ -38,12 +38,42 @@ function CameraShake() {
   return null
 }
 
+function ScreenFlash() {
+  const flashIntensity = useRef(0)
+  
+  useFrame(() => {
+    flashIntensity.current *= 0.85
+  })
+  
+  React.useEffect(() => {
+    window.__triggerScreenFlash = (color = '#ffffff', intensity = 0.3) => {
+      flashIntensity.current = intensity
+    }
+    return () => { delete window.__triggerScreenFlash }
+  }, [])
+  
+  if (flashIntensity.current < 0.01) return null
+  
+  return (
+    <mesh position={[0, 0, 5]}>
+      <planeGeometry args={[100, 100]} />
+      <meshBasicMaterial 
+        color="#ffffff" 
+        transparent 
+        opacity={flashIntensity.current} 
+        side={2} 
+      />
+    </mesh>
+  )
+}
+
 function Scene() {
   const isPlaying = useGameStore((s) => s.gameState === 'playing')
 
   return (
     <>
       <CameraShake />
+      <ScreenFlash />
       <SpaceEnvironment />
       <ParticleSystem />
       <PowerUps isPlaying={isPlaying} />
@@ -54,6 +84,12 @@ function Scene() {
 }
 
 export default function App() {
+  const gameState = useGameStore((s) => s.gameState)
+  
+  React.useEffect(() => {
+    window.__gameState = gameState
+  }, [gameState])
+  
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <SoundSystem />

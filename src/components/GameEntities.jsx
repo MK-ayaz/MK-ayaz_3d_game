@@ -140,16 +140,21 @@ export function GameEntities({ isPlaying }) {
     const delta = 1 / 60 // Fixed timestep approximation
     const ents = entitiesRef.current
 
+    // Update combo timer
+    useGameStore.getState().updateCombo()
+
     // ── Wave progression ──
     const destroyed = useGameStore.getState().enemiesDestroyed
     const currentWave = useGameStore.getState().wave
-    if (destroyed > 0 && destroyed % (5 + currentWave * 3) === 0) {
+    const enemiesPerWave = 5 + currentWave * 3
+    if (destroyed > 0 && destroyed % enemiesPerWave === 0) {
       useGameStore.getState().nextWave()
     }
 
-    // ── Spawn obstacles ──
+    // ── Spawn obstacles with progressive difficulty ──
     const speed = ENEMY_SPEED_BASE + currentWave * 1.5
-    const spawnInterval = Math.max(0.6, 2.2 - currentWave * 0.15)
+    const spawnInterval = Math.max(0.4, 2.2 - currentWave * 0.2)
+    const enemyRatio = Math.min(0.8, 0.45 + currentWave * 0.05) // More enemies in later waves
 
     if (now - lastSpawnRef.current > spawnInterval * 1000) {
       lastSpawnRef.current = now
@@ -157,7 +162,7 @@ export function GameEntities({ isPlaying }) {
       const x = (Math.random() - 0.5) * ARENA_SIZE * 2
       const y = (Math.random() - 0.5) * ARENA_SIZE
       const z = -ENEMY_SPAWN_DISTANCE
-      const isAsteroid = Math.random() > 0.45
+      const isAsteroid = Math.random() > enemyRatio
       const obsSpeed = speed + Math.random() * 3
 
       if (isAsteroid) {
@@ -248,7 +253,8 @@ export function GameEntities({ isPlaying }) {
         if (dist < hitRadius) {
           o.active = false
           b.active = false
-          useGameStore.getState().addScore(o.type === 'asteroid' ? 15 : 25)
+          const store = useGameStore.getState()
+          store.addScore(o.type === 'asteroid' ? 15 : 25)
           
           // Trigger explosion effect
           if (window.__triggerExplosion) {
@@ -259,6 +265,12 @@ export function GameEntities({ isPlaying }) {
           // Play explosion sound
           if (window.__soundManager) {
             window.__soundManager.playExplosion()
+          }
+          
+          // Trigger screen flash on high combos
+          if (store.comboMultiplier >= 3 && window.__triggerScreenFlash) {
+            const flashColor = store.comboMultiplier >= 5 ? '#ff00ff' : '#ff6600'
+            window.__triggerScreenFlash(flashColor, 0.2)
           }
           
           obstaclesChanged = true

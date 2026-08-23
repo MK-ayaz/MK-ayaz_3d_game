@@ -9,6 +9,11 @@ export function GameUI() {
   const activePowerUp = useGameStore((s) => s.activePowerUp)
   const powerUpTimer = useGameStore((s) => s.powerUpTimer)
   const highScore = useGameStore((s) => s.highScore)
+  const combo = useGameStore((s) => s.combo)
+  const comboMultiplier = useGameStore((s) => s.comboMultiplier)
+  const comboTimer = useGameStore((s) => s.comboTimer)
+  const maxCombo = useGameStore((s) => s.maxCombo)
+  const unlockedAchievements = useGameStore((s) => s.unlockedAchievements)
   const startGame = useGameStore((s) => s.startGame)
   const resumeGame = useGameStore((s) => s.resumeGame)
   const resetGame = useGameStore((s) => s.resetGame)
@@ -163,6 +168,114 @@ export function GameUI() {
         </div>
       )}
 
+      {/* Combo indicator */}
+      {gameState === 'playing' && combo > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: 80,
+          right: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+        }}>
+          <div style={{
+            color: comboMultiplier >= 5 ? '#ff00ff' : 
+                  comboMultiplier >= 3 ? '#ff6600' : '#ffff00',
+            fontSize: 24,
+            fontWeight: 'bold',
+            textShadow: `0 0 15px ${comboMultiplier >= 5 ? '#ff00ff' : 
+                  comboMultiplier >= 3 ? '#ff6600' : '#ffff00'}`,
+            marginBottom: 4,
+          }}>
+            {combo}x COMBO
+          </div>
+          <div style={{
+            color: '#ffffff',
+            fontSize: 14,
+            fontWeight: 'bold',
+          }}>
+            {comboMultiplier}x SCORE
+          </div>
+          <div style={{
+            width: 100,
+            height: 4,
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: 2,
+            overflow: 'hidden',
+            marginTop: 4,
+          }}>
+            <div style={{
+              width: `${Math.max(0, (comboTimer - Date.now()) / 3000 * 100)}%`,
+              height: '100%',
+              background: comboMultiplier >= 5 ? '#ff00ff' : 
+                       comboMultiplier >= 3 ? '#ff6600' : '#ffff00',
+              borderRadius: 2,
+              transition: 'width 0.05s linear',
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Achievement notifications */}
+      {unlockedAchievements.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: 140,
+          right: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: 8,
+        }}>
+          {unlockedAchievements.slice(-3).map((achievementId, index) => {
+            const achievement = {
+              first_blood: { name: 'First Blood', icon: '🎯' },
+              combo_master: { name: 'Combo Master', icon: '🔥' },
+              wave_survivor: { name: 'Wave Survivor', icon: '🌊' },
+              score_hunter: { name: 'Score Hunter', icon: '💯' },
+              power_collector: { name: 'Power Collector', icon: '⚡' },
+              combo_legend: { name: 'Combo Legend', icon: '👑' },
+              wave_master: { name: 'Wave Master', icon: '🏆' },
+              high_scorer: { name: 'High Scorer', icon: '🌟' },
+              perfect_game: { name: 'Perfect Game', icon: '💎' },
+            }[achievementId] || { name: 'Achievement', icon: '🏅' }
+            
+            return (
+              <div key={achievementId} style={{
+                background: 'rgba(0, 0, 0, 0.8)',
+                border: '2px solid #ffd700',
+                borderRadius: 8,
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                animation: 'slideIn 0.3s ease-out',
+                boxShadow: '0 0 15px rgba(255, 215, 0, 0.5)',
+              }}>
+                <span style={{ fontSize: 24 }}>{achievement.icon}</span>
+                <div>
+                  <div style={{
+                    color: '#ffd700',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    textShadow: '0 0 5px #ffd700',
+                  }}>
+                    ACHIEVEMENT UNLOCKED
+                  </div>
+                  <div style={{
+                    color: '#ffffff',
+                    fontSize: 14,
+                    fontWeight: 'bold',
+                  }}>
+                    {achievement.name}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Main Menu */}
       {gameState === 'menu' && (
         <div style={{
@@ -262,9 +375,23 @@ export function GameUI() {
           <div style={{
             color: '#cc8866',
             fontSize: 18,
-            marginBottom: 40,
+            marginBottom: 8,
           }}>
             WAVE: {wave}
+          </div>
+          <div style={{
+            color: '#88aaff',
+            fontSize: 16,
+            marginBottom: 8,
+          }}>
+            MAX COMBO: {maxCombo}x
+          </div>
+          <div style={{
+            color: '#666666',
+            fontSize: 14,
+            marginBottom: 40,
+          }}>
+            HIGH SCORE: {highScore}
           </div>
 
           <button

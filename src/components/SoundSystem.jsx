@@ -4,7 +4,10 @@ class SoundManager {
   constructor() {
     this.context = null
     this.masterGain = null
+    this.musicGain = null
     this.initialized = false
+    this.musicOscillators = []
+    this.musicPlaying = false
   }
 
   init() {
@@ -13,6 +16,11 @@ class SoundManager {
     this.masterGain = this.context.createGain()
     this.masterGain.gain.value = 0.3
     this.masterGain.connect(this.context.destination)
+    
+    this.musicGain = this.context.createGain()
+    this.musicGain.gain.value = 0.15
+    this.musicGain.connect(this.masterGain)
+    
     this.initialized = true
   }
 
@@ -102,9 +110,95 @@ class SoundManager {
     osc.stop(this.context.currentTime + 0.3)
   }
 
+  playAchievement() {
+    if (!this.initialized) this.init()
+    const notes = [523.25, 659.25, 783.99, 1046.50] // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      const osc = this.context.createOscillator()
+      const gain = this.context.createGain()
+      
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, this.context.currentTime + i * 0.1)
+      
+      gain.gain.setValueAtTime(0, this.context.currentTime + i * 0.1)
+      gain.gain.linearRampToValueAtTime(0.2, this.context.currentTime + i * 0.1 + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + i * 0.1 + 0.3)
+      
+      osc.connect(gain)
+      gain.connect(this.masterGain)
+      
+      osc.start(this.context.currentTime + i * 0.1)
+      osc.stop(this.context.currentTime + i * 0.1 + 0.3)
+    })
+  }
+
+  startMusic() {
+    if (!this.initialized) this.init()
+    if (this.musicPlaying) return
+    
+    this.musicPlaying = true
+    const bassNotes = [65.41, 73.42, 82.41, 87.31] // C2, D2, E2, F2
+    const melodyNotes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00] // C4, D4, E4, F4, G4, A4
+    
+    // Bass line
+    const bassOsc = this.context.createOscillator()
+    const bassGain = this.context.createGain()
+    bassOsc.type = 'triangle'
+    bassOsc.frequency.value = bassNotes[0]
+    bassGain.gain.value = 0.3
+    bassOsc.connect(bassGain)
+    bassGain.connect(this.musicGain)
+    bassOsc.start()
+    this.musicOscillators.push(bassOsc)
+    
+    // Change bass note every 2 seconds
+    let bassIndex = 0
+    this.bassInterval = setInterval(() => {
+      bassIndex = (bassIndex + 1) % bassNotes.length
+      bassOsc.frequency.setValueAtTime(bassNotes[bassIndex], this.context.currentTime)
+    }, 2000)
+    
+    // Simple melody
+    let melodyIndex = 0
+    this.melodyInterval = setInterval(() => {
+      if (!this.musicPlaying) return
+      
+      const osc = this.context.createOscillator()
+      const gain = this.context.createGain()
+      
+      osc.type = 'sine'
+      osc.frequency.value = melodyNotes[melodyIndex]
+      gain.gain.setValueAtTime(0.1, this.context.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + 0.3)
+      
+      osc.connect(gain)
+      gain.connect(this.musicGain)
+      
+      osc.start()
+      osc.stop(this.context.currentTime + 0.3)
+      
+      melodyIndex = (melodyIndex + 1) % melodyNotes.length
+    }, 500)
+  }
+
+  stopMusic() {
+    this.musicPlaying = false
+    this.musicOscillators.forEach(osc => osc.stop())
+    this.musicOscillators = []
+    
+    if (this.bassInterval) clearInterval(this.bassInterval)
+    if (this.melodyInterval) clearInterval(this.melodyInterval)
+  }
+
   setVolume(value) {
     if (this.masterGain) {
       this.masterGain.gain.value = value
+    }
+  }
+
+  setMusicVolume(value) {
+    if (this.musicGain) {
+      this.musicGain.gain.value = value
     }
   }
 }
@@ -112,6 +206,8 @@ class SoundManager {
 const soundManager = new SoundManager()
 
 export function SoundSystem() {
+  const gameState = useRef('menu')
+  
   useEffect(() => {
     // Initialize on first user interaction
     const handleInit = () => {
@@ -130,6 +226,25 @@ export function SoundSystem() {
       window.removeEventListener('click', handleInit)
       window.removeEventListener('keydown', handleInit)
     }
+  }, [])
+
+  // Handle music based on game state
+  useEffect(() => {
+    const checkGameState = () => {
+      const currentState = window.__gameState || 'menu'
+      if (currentState !== gameState.current) {
+        gameState.current = currentState
+        
+        if (currentState === 'playing') {
+          soundManager.startMusic()
+        } else {
+          soundManager.stopMusic()
+        }
+      }
+    }
+    
+    const interval = setInterval(checkGameState, 100)
+    return () => clearInterval(interval)
   }, [])
 
   return null
