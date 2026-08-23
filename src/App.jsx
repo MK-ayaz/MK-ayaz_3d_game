@@ -1,6 +1,5 @@
 import React, { useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import { PlayerShip } from './components/PlayerShip'
 import { GameEntities } from './components/GameEntities'
 import { SpaceEnvironment } from './components/SpaceEnvironment'
@@ -60,14 +59,10 @@ export default function App() {
       <SoundSystem />
       <Canvas
         camera={{ position: [0, 2, 10], fov: 60, near: 0.1, far: 200 }}
-        gl={{ antialias: false, alpha: false }}
+        gl={{ antialias: true, alpha: false }}
         style={{ background: '#000011' }}
       >
         <Scene />
-        <EffectComposer>
-          <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} height={300} intensity={1.5} />
-          <Vignette eskil={false} offset={0.1} darkness={1.1} />
-        </EffectComposer>
       </Canvas>
       <GameUI />
     </div>
