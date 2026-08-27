@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useGameStore } from '../store'
 
 export function GameUI() {
@@ -16,7 +16,36 @@ export function GameUI() {
   const unlockedAchievements = useGameStore((s) => s.unlockedAchievements)
   const startGame = useGameStore((s) => s.startGame)
   const resumeGame = useGameStore((s) => s.resumeGame)
+  const pauseGame = useGameStore((s) => s.pauseGame)
   const resetGame = useGameStore((s) => s.resetGame)
+  const heat = useGameStore((s) => s.heat)
+  const overheated = useGameStore((s) => s.overheated)
+  const bossActive = useGameStore((s) => s.bossActive)
+  const [chargeValue, setChargeValue] = useState(0)
+
+  // Esc to pause/resume
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.code === 'Escape') {
+        const s = useGameStore.getState()
+        if (s.gameState === 'playing') pauseGame()
+        else if (s.gameState === 'paused') resumeGame()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pauseGame, resumeGame])
+
+  // Poll charge value (set by PlayerShip via window.__gameChargeState)
+  useEffect(() => {
+    let raf
+    const tick = () => {
+      setChargeValue(window.__playerCharge ?? 0)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   return (
     <div style={{
@@ -124,7 +153,91 @@ export function GameUI() {
           fontSize: 12,
           textAlign: 'center',
         }}>
-          WASD / Arrow Keys to move • SPACE to shoot
+          WASD / Arrow Keys to move • TAP SPACE for shot • HOLD for spread • ESC to pause
+        </div>
+      )}
+
+      {/* Charge meter near bottom-center, mirrors the in-world visual */}
+      {gameState === 'playing' && chargeValue > 0.05 && (
+        <div style={{
+          position: 'absolute',
+          bottom: 90,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 120,
+          height: 6,
+          background: 'rgba(255,255,255,0.1)',
+          borderRadius: 3,
+          overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.2)',
+        }}>
+          <div style={{
+            width: `${Math.min(100, chargeValue * 100)}%`,
+            height: '100%',
+            background: chargeValue >= 1
+              ? 'linear-gradient(90deg, #ffaa00, #ff4400)'
+              : chargeValue >= 0.3
+                ? 'linear-gradient(90deg, #00ffff, #00aaff)'
+                : 'linear-gradient(90deg, #00ffaa, #00ffff)',
+            transition: 'width 0.05s linear',
+            boxShadow: `0 0 8px ${chargeValue >= 1 ? '#ffaa00' : '#00ffff'}`,
+          }} />
+        </div>
+      )}
+
+      {/* Heat bar */}
+      {gameState === 'playing' && (
+        <div style={{
+          position: 'absolute',
+          bottom: 20,
+          right: 20,
+          width: 100,
+          height: 6,
+          background: 'rgba(255,255,255,0.1)',
+          borderRadius: 3,
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${heat}%`,
+            height: '100%',
+            background: overheated
+              ? 'linear-gradient(90deg, #ff0000, #ff4400)'
+              : 'linear-gradient(90deg, #ffaa00, #ff6600)',
+            transition: overheated ? 'width 2s linear' : 'width 0.1s linear',
+            boxShadow: overheated ? '0 0 8px #ff0000' : 'none',
+          }} />
+        </div>
+      )}
+      {gameState === 'playing' && overheated && (
+        <div style={{
+          position: 'absolute',
+          bottom: 30,
+          right: 20,
+          color: '#ff4444',
+          fontSize: 11,
+          fontWeight: 'bold',
+          textShadow: '0 0 6px #ff0000',
+          letterSpacing: 1,
+        }}>
+          OVERHEAT
+        </div>
+      )}
+
+      {/* Boss banner */}
+      {gameState === 'playing' && bossActive && (
+        <div style={{
+          position: 'absolute',
+          top: 30,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: '#ff4444',
+          fontSize: 28,
+          fontWeight: 'bold',
+          textShadow: '0 0 20px #ff0000, 0 0 40px #ff0000',
+          letterSpacing: 4,
+          animation: 'pulse 1s infinite',
+        }}>
+          ⚠ BOSS INCOMING ⚠
         </div>
       )}
 

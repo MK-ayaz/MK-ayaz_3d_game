@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import { useGameStore } from '../store'
 
 class SoundManager {
   constructor() {
@@ -207,7 +208,7 @@ const soundManager = new SoundManager()
 
 export function SoundSystem() {
   const gameState = useRef('menu')
-  
+
   useEffect(() => {
     // Initialize on first user interaction
     const handleInit = () => {
@@ -215,36 +216,42 @@ export function SoundSystem() {
       window.removeEventListener('click', handleInit)
       window.removeEventListener('keydown', handleInit)
     }
-    
+
     window.addEventListener('click', handleInit)
     window.addEventListener('keydown', handleInit)
-    
+
     // Expose to window for game entities
     window.__soundManager = soundManager
-    
+
     return () => {
       window.removeEventListener('click', handleInit)
       window.removeEventListener('keydown', handleInit)
     }
   }, [])
 
-  // Handle music based on game state
+  // Subscribe to gameState changes via Zustand (no polling)
   useEffect(() => {
-    const checkGameState = () => {
-      const currentState = window.__gameState || 'menu'
+    const handleStateChange = (state) => {
+      const currentState = state.gameState
       if (currentState !== gameState.current) {
+        const prev = gameState.current
         gameState.current = currentState
-        
-        if (currentState === 'playing') {
+
+        if (currentState === 'playing' && prev !== 'playing') {
           soundManager.startMusic()
-        } else {
+        } else if (currentState !== 'playing' && prev === 'playing') {
           soundManager.stopMusic()
         }
       }
     }
-    
-    const interval = setInterval(checkGameState, 100)
-    return () => clearInterval(interval)
+
+    // Initial sync
+    handleStateChange(useGameStore.getState())
+
+    // Subscribe to changes
+    const unsubscribe = useGameStore.subscribe(handleStateChange)
+
+    return () => unsubscribe()
   }, [])
 
   return null

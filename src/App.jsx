@@ -7,6 +7,8 @@ import { GameUI } from './components/GameUI'
 import { ParticleSystem } from './components/ParticleSystem'
 import { SoundSystem } from './components/SoundSystem'
 import { PowerUps } from './components/PowerUps'
+import { PostFX } from './components/PostFX'
+import { EnemyProjectiles } from './components/EnemyProjectiles'
 import { useGameStore } from './store'
 
 function CameraShake() {
@@ -39,29 +41,47 @@ function CameraShake() {
 }
 
 function ScreenFlash() {
+  const flashColor = useRef('#ffffff')
   const flashIntensity = useRef(0)
-  
+  const materialRef = useRef()
+
   useFrame(() => {
-    flashIntensity.current *= 0.85
+    if (flashIntensity.current > 0.01) {
+      flashIntensity.current *= 0.85
+      if (materialRef.current) {
+        materialRef.current.opacity = flashIntensity.current
+      }
+    } else if (flashIntensity.current !== 0) {
+      flashIntensity.current = 0
+      if (materialRef.current) {
+        materialRef.current.opacity = 0
+      }
+    }
   })
-  
+
   React.useEffect(() => {
     window.__triggerScreenFlash = (color = '#ffffff', intensity = 0.3) => {
+      flashColor.current = color
       flashIntensity.current = intensity
+      if (materialRef.current) {
+        materialRef.current.color.set(color)
+        materialRef.current.opacity = intensity
+      }
     }
     return () => { delete window.__triggerScreenFlash }
   }, [])
-  
-  if (flashIntensity.current < 0.01) return null
-  
+
   return (
-    <mesh position={[0, 0, 5]}>
+    <mesh position={[0, 0, 5]} renderOrder={999}>
       <planeGeometry args={[100, 100]} />
-      <meshBasicMaterial 
-        color="#ffffff" 
-        transparent 
-        opacity={flashIntensity.current} 
-        side={2} 
+      <meshBasicMaterial
+        ref={materialRef}
+        color="#ffffff"
+        transparent
+        opacity={0}
+        depthTest={false}
+        depthWrite={false}
+        side={2}
       />
     </mesh>
   )
@@ -79,17 +99,32 @@ function Scene() {
       <PowerUps isPlaying={isPlaying} />
       <PlayerShip isPlaying={isPlaying} />
       <GameEntities isPlaying={isPlaying} />
+      <EnemyProjectiles />
+      <PostFX />
     </>
   )
 }
 
 export default function App() {
-  const gameState = useGameStore((s) => s.gameState)
-  
+  // Expose player position and hit handler globally so enemy projectiles can collide
   React.useEffect(() => {
-    window.__gameState = gameState
-  }, [gameState])
-  
+    const unsub = useGameStore.subscribe((state) => {
+      window.__playerPos = state.playerPosition
+    })
+    window.__playerPos = useGameStore.getState().playerPosition
+    window.__playerHit = (amount, hitFromPos) => {
+      const store = useGameStore.getState()
+      store.takeDamage(amount)
+      if (window.__soundManager) window.__soundManager.playHit()
+      if (window.__triggerCameraShake) window.__triggerCameraShake(0.4)
+      if (window.__triggerScreenFlash) window.__triggerScreenFlash('#ff0000', 0.15)
+    }
+    return () => {
+      unsub()
+      delete window.__playerHit
+    }
+  }, [])
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <SoundSystem />

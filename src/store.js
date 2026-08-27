@@ -52,11 +52,12 @@ const ACHIEVEMENTS = {
 const INITIAL_STATE = {
   score: 0,
   health: 100,
+  maxHealth: 100,
   wave: 1,
-  gameState: 'menu', // 'menu' | 'playing' | 'paused' | 'gameover'
+  gameState: 'menu', // 'menu' | 'playing' | 'paused' | 'gameover' | 'upgrading'
   enemiesDestroyed: 0,
   playerPosition: [0, 0, 0],
-  activePowerUp: null, // 'health' | 'speed' | 'multishot' | null
+  activePowerUp: null, // 'health' | 'speed' | 'multishot' | 'slowmo' | null
   powerUpTimer: 0,
   highScore: getHighScore(),
   combo: 0,
@@ -68,6 +69,24 @@ const INITIAL_STATE = {
   unlockedAchievements: [],
   powerUpsCollected: 0,
   waveDamageTaken: 0,
+  // Roguelite upgrades
+  upgrades: {
+    damage: 0,
+    fireRate: 0,
+    moveSpeed: 0,
+    maxHp: 0,
+    multishot: 0,
+    critChance: 0,
+    projSize: 0,
+    lifesteal: 0,
+  },
+  // Combo-based near-miss / heat
+  heat: 0,
+  overheated: false,
+  nearMissFlash: 0,
+  // Boss state
+  bossActive: false,
+  bossId: 0,
 }
 
 export const useGameStore = create((set, get) => ({
@@ -258,6 +277,38 @@ export const useGameStore = create((set, get) => ({
   },
 
   resetGame: () => set({ ...INITIAL_STATE, highScore: getHighScore(), achievements: getAchievements() }),
+
+  // Apply an upgrade tier (used by UpgradeScreen)
+  applyUpgrade: (key) => set((state) => {
+    const newUpgrades = { ...state.upgrades, [key]: (state.upgrades[key] || 0) + 1 }
+    let newMax = state.maxHealth
+    let newHealth = state.health
+    if (key === 'maxHp') {
+      newMax = 100 + newUpgrades.maxHp * 25
+      newHealth = newMax
+    }
+    return { upgrades: newUpgrades, maxHealth: newMax, health: newHealth }
+  }),
+
+  // Heat system
+  addHeat: (amount) => set((state) => {
+    if (state.overheated) return {}
+    const newHeat = Math.min(100, state.heat + amount)
+    return { heat: newHeat, overheated: newHeat >= 100 }
+  }),
+  coolHeat: (amount) => set((state) => {
+    if (state.overheated) {
+      return { heat: Math.max(0, state.heat - amount), overheated: state.heat - amount > 30 }
+    }
+    return { heat: Math.max(0, state.heat - amount) }
+  }),
+  resetHeat: () => set({ heat: 0, overheated: false }),
+
+  // Near miss flash trigger
+  triggerNearMiss: () => set({ nearMissFlash: Date.now() + 400 }),
+
+  // Boss state
+  setBossActive: (active) => set({ bossActive: active }),
 
   getAchievements: () => get().achievements,
 }))

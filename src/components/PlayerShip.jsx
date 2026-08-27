@@ -2,19 +2,34 @@ import React, { useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '../store'
+import { ChargedShot } from './ChargedShot'
 
-const PLAYER_SPEED = 15
+const PLAYER_SPEED_BASE = 15
 const ARENA_BOUNDS_X = 11
 const ARENA_BOUNDS_Y = 6
+const CHARGE_TIME = 1.2 // seconds to full charge
+const CHARGE_THRESHOLD = 0.3 // min charge to fire a spread
 
 export function PlayerShip({ isPlaying }) {
   const groupRef = useRef()
   const posRef = useRef([0, 0, 0])
   const keysRef = useRef({})
+  const chargeRef = useRef(0) // 0..1
+  const spaceHeldRef = useRef(false)
+
+  // Subscribe to upgrades for player speed
+  const speedMultiplier = useGameStore((s) => s.upgrades?.moveSpeed ?? 1)
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       keysRef.current[e.code] = true
+      if (e.code === 'Space') {
+        spaceHeldRef.current = true
+        if (chargeRef.current === 0) {
+          // mark start of charge by setting to tiny non-zero
+          chargeRef.current = 0.001
+        }
+      }
       // Prevent page scrolling
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault()
@@ -22,6 +37,19 @@ export function PlayerShip({ isPlaying }) {
     }
     const handleKeyUp = (e) => {
       keysRef.current[e.code] = false
+      if (e.code === 'Space') {
+        spaceHeldRef.current = false
+        // Fire based on charge
+        const charge = chargeRef.current
+        if (charge >= CHARGE_THRESHOLD) {
+          // Charged spread shot
+          window.__gameFireSpread?.([...posRef.current], charge)
+        } else if (charge > 0) {
+          // Quick tap: single aimed shot
+          window.__gameFire?.([...posRef.current])
+        }
+        chargeRef.current = 0
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
@@ -32,18 +60,35 @@ export function PlayerShip({ isPlaying }) {
   }, [])
 
   useFrame((_, delta) => {
-    if (!isPlaying) return
+    if (!isPlaying) {
+      // Reset charge when not playing
+      chargeRef.current = 0
+      spaceHeldRef.current = false
+      return
+    }
 
     const keys = keysRef.current
     const pos = posRef.current
+    const speed = PLAYER_SPEED_BASE * speedMultiplier
 
-    if (keys['ArrowLeft'] || keys['KeyA']) pos[0] -= PLAYER_SPEED * delta
-    if (keys['ArrowRight'] || keys['KeyD']) pos[0] += PLAYER_SPEED * delta
-    if (keys['ArrowUp'] || keys['KeyW']) pos[1] += PLAYER_SPEED * delta
-    if (keys['ArrowDown'] || keys['KeyS']) pos[1] -= PLAYER_SPEED * delta
+    if (keys['ArrowLeft'] || keys['KeyA']) pos[0] -= speed * delta
+    if (keys['ArrowRight'] || keys['KeyD']) pos[0] += speed * delta
+    if (keys['ArrowUp'] || keys['KeyW']) pos[1] += speed * delta
+    if (keys['ArrowDown'] || keys['KeyS']) pos[1] -= speed * delta
 
     pos[0] = Math.max(-ARENA_BOUNDS_X, Math.min(ARENA_BOUNDS_X, pos[0]))
     pos[1] = Math.max(-ARENA_BOUNDS_Y, Math.min(ARENA_BOUNDS_Y, pos[1]))
+
+    // Charge meter
+    if (spaceHeldRef.current && chargeRef.current < 1) {
+      chargeRef.current = Math.min(1, chargeRef.current + delta / CHARGE_TIME)
+      window.__gameChargeState?.(chargeRef.current)
+      window.__playerCharge = chargeRef.current
+    } else if (!spaceHeldRef.current && chargeRef.current > 0 && chargeRef.current < CHARGE_THRESHOLD) {
+      // Released below threshold — counts as tap (will fire on keyup); no reset here
+    } else if (!spaceHeldRef.current) {
+      window.__playerCharge = 0
+    }
 
     // Store position for GameEntities auto-shoot
     useGameStore.getState().setPlayerPosition([...pos])
@@ -98,6 +143,9 @@ export function PlayerShip({ isPlaying }) {
 
       {/* Point light on ship */}
       <pointLight position={[0, 0, 1]} intensity={1} color="#00aaff" distance={8} />
+
+      {/* Charge visual */}
+      <ChargedShot />
     </group>
   )
 }
