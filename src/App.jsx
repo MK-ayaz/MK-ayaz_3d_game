@@ -12,6 +12,7 @@ import { EnemyProjectiles } from './components/EnemyProjectiles'
 import { PlayerTrail } from './components/PlayerTrail'
 import { DamageNumbers } from './components/DamageNumbers'
 import { NearMissDetector } from './components/NearMissDetector'
+import { SmartBomb } from './components/SmartBomb'
 import { useGameStore } from './store'
 
 function CameraShake() {
@@ -93,6 +94,26 @@ function ScreenFlash() {
 function Scene() {
   const isPlaying = useGameStore((s) => s.gameState === 'playing')
 
+  // Detonate handler: kill all enemies and projectiles
+  const handleBomb = () => {
+    // The visual ring is in SmartBomb, we just need to clear entities
+    if (window.__gameEnemies) {
+      window.__gameEnemies.forEach((e) => { e.active = false })
+    }
+    // Award score
+    const store = useGameStore.getState()
+    store.addScore(100)
+    // Mass explosion particles
+    if (window.__triggerExplosion) {
+      for (let i = 0; i < 5; i++) {
+        const x = (Math.random() - 0.5) * 20
+        const y = (Math.random() - 0.5) * 12
+        const z = -10 + Math.random() * -20
+        window.__triggerExplosion([x, y, z], '#ffff00', 40)
+      }
+    }
+  }
+
   return (
     <>
       <CameraShake />
@@ -106,6 +127,7 @@ function Scene() {
       <PlayerShip isPlaying={isPlaying} />
       <GameEntities isPlaying={isPlaying} />
       <EnemyProjectiles />
+      <SmartBomb onDetonate={handleBomb} />
       <PostFX />
     </>
   )
@@ -140,6 +162,19 @@ export default function App() {
     }
     document.addEventListener('visibilitychange', handleVis)
     return () => document.removeEventListener('visibilitychange', handleVis)
+  }, [])
+
+  // B key for smart bomb
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.code === 'KeyB' || e.code === 'KeyX') {
+        if (useGameStore.getState().gameState === 'playing') {
+          window.__triggerBomb?.()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   return (

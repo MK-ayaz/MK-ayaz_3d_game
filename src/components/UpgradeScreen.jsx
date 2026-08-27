@@ -69,29 +69,29 @@ function pickRandomUpgrades(count, currentUpgrades) {
 }
 
 export function UpgradeScreen() {
-  const gameState = useGameStore((s) => s.gameState)
+  const pendingUpgrade = useGameStore((s) => s.pendingUpgrade)
   const wave = useGameStore((s) => s.wave)
   const upgrades = useGameStore((s) => s.upgrades)
   const applyUpgrade = useGameStore((s) => s.applyUpgrade)
+  const clearPendingUpgrade = useGameStore((s) => s.clearPendingUpgrade)
   const [choices, setChoices] = useState([])
   const [animation, setAnimation] = useState('in')
 
   useEffect(() => {
-    if (gameState === 'upgrading') {
+    if (pendingUpgrade) {
       setChoices(pickRandomUpgrades(3, upgrades))
       setAnimation('in')
     }
-  }, [gameState, wave, upgrades])
+  }, [pendingUpgrade, wave, upgrades])
 
-  if (gameState !== 'upgrading') return null
+  if (!pendingUpgrade) return null
 
   const handlePick = (key) => {
     if (window.__soundManager) window.__soundManager.playPowerUp?.()
     applyUpgrade(key)
     setAnimation('out')
     setTimeout(() => {
-      // Resume game
-      useGameStore.setState({ gameState: 'playing' })
+      clearPendingUpgrade()
     }, 250)
   }
 

@@ -49,6 +49,12 @@ const ACHIEVEMENTS = {
   perfect_game: { id: 'perfect_game', name: 'Perfect Game', description: 'Complete a wave without taking damage', icon: '💎' },
 }
 
+export const SHIP_STATS = {
+  fighter: { maxHealth: 100, speed: 1.0, fireRate: 1.0, color: '#00aaff' },
+  interceptor: { maxHealth: 70, speed: 1.5, fireRate: 1.2, color: '#00ff88' },
+  destroyer: { maxHealth: 175, speed: 0.75, fireRate: 0.85, color: '#ff8800' },
+}
+
 const INITIAL_STATE = {
   score: 0,
   health: 100,
@@ -91,17 +97,51 @@ const INITIAL_STATE = {
   muted: false,
   volume: 0.3,
   bloomEnabled: true,
+  // Pending upgrade (between-wave overlay)
+  pendingUpgrade: false,
+  // Selected ship type: 'fighter' | 'interceptor' | 'destroyer'
+  shipType: 'fighter',
+  // Smart bombs available
+  bombs: 1,
+  // Stats tracking
+  shotsFired: 0,
+  shotsHit: 0,
+  totalKills: 0,
+  totalScore: 0,
+  bestWave: 1,
+  bestScore: 0,
+  // Daily challenge
+  dailySeed: 0,
+  dailyLeaderboard: [],
+  // Settings - keybinds
+  keybinds: {
+    up: 'ArrowUp',
+    down: 'ArrowDown',
+    left: 'ArrowLeft',
+    right: 'ArrowRight',
+    shoot: 'Space',
+    bomb: 'KeyB',
+  },
 }
 
 export const useGameStore = create((set, get) => ({
   ...INITIAL_STATE,
 
-  startGame: () => set({
-    ...INITIAL_STATE,
-    gameState: 'playing',
-    highScore: getHighScore(),
-    totalGamesPlayed: get().totalGamesPlayed + 1,
-    achievements: getAchievements(),
+  startGame: () => set(() => {
+    const shipType = get().shipType
+    const stats = SHIP_STATS[shipType] || SHIP_STATS.fighter
+    return {
+      ...INITIAL_STATE,
+      gameState: 'playing',
+      highScore: getHighScore(),
+      totalGamesPlayed: get().totalGamesPlayed + 1,
+      achievements: getAchievements(),
+      bestScore: Math.max(get().bestScore, get().highScore),
+      bestWave: Math.max(get().bestWave, get().wave),
+      // Apply ship-specific max health
+      maxHealth: stats.maxHealth,
+      health: stats.maxHealth,
+    }
   }),
 
   pauseGame: () => set({ gameState: 'paused' }),
@@ -172,6 +212,7 @@ export const useGameStore = create((set, get) => ({
       maxCombo: Math.max(state.maxCombo, newCombo),
       unlockedAchievements: newUnlocked,
       achievements,
+      totalKills: state.totalKills + 1,
     }
   }),
 
@@ -241,7 +282,7 @@ export const useGameStore = create((set, get) => ({
       achievements,
       waveDamageTaken: 0, // Reset damage counter for new wave
       health: Math.min(state.maxHealth, state.health + healAmount), // Small heal on wave completion
-      gameState: 'upgrading', // Show upgrade screen between waves
+      pendingUpgrade: true, // Show upgrade screen overlay; game loop keeps running
     }
   }),
 
@@ -326,6 +367,27 @@ export const useGameStore = create((set, get) => ({
   setMuted: (muted) => set({ muted }),
   setVolume: (vol) => set({ volume: vol }),
   setBloomEnabled: (enabled) => set({ bloomEnabled: enabled }),
+
+  // Pending upgrade
+  clearPendingUpgrade: () => set({ pendingUpgrade: false }),
+
+  // Ship selection
+  setShipType: (type) => set({ shipType: type }),
+
+  // Bombs
+  useBomb: () => set((state) => state.bombs > 0 ? { bombs: state.bombs - 1 } : {}),
+  addBomb: (n = 1) => set((state) => ({ bombs: Math.min(3, state.bombs + n) })),
+
+  // Stats
+  incShotsFired: () => set((state) => ({ shotsFired: state.shotsFired + 1 })),
+  incShotsHit: () => set((state) => ({ shotsHit: state.shotsHit + 1 })),
+
+  // Keybinds
+  setKeybind: (action, code) => set((state) => ({ keybinds: { ...state.keybinds, [action]: code } })),
+
+  // Daily challenge
+  setDailySeed: (seed) => set({ dailySeed: seed }),
+  setDailyLeaderboard: (lb) => set({ dailyLeaderboard: lb }),
 
   getAchievements: () => get().achievements,
 }))

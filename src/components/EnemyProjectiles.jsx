@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { useGameStore } from '../store'
 
 const PROJECTILE_SPEED = 22
 const LIFETIME_MS = 4500
@@ -80,12 +81,10 @@ export function EnemyProjectiles() {
       if (dist < 0.8) {
         p.active = false
         changed = true
-        // Damage player
-        if (window.__playerHit) {
+        // Damage player (skip if upgrade overlay open)
+        const pendingUpgrade = useGameStore.getState().pendingUpgrade
+        if (!pendingUpgrade && window.__playerHit) {
           window.__playerHit(10, p.posRef.current)
-        } else if (window.__soundManager) {
-          // Fallback to takeDamage via store
-          // (window.__playerHit is wired up in App)
         }
       }
     })

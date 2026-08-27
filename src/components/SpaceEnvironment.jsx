@@ -179,6 +179,105 @@ function FleetShips() {
   )
 }
 
+// ─── Parallax distant galaxy ───
+function DistantGalaxy() {
+  const meshRef = useRef()
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.z += delta * 0.005
+    }
+  })
+  // A faint spiral galaxy in the deep background
+  return (
+    <group position={[15, 8, -120]} ref={meshRef}>
+      <mesh>
+        <sphereGeometry args={[15, 32, 32]} />
+        <meshBasicMaterial color="#cc88ff" transparent opacity={0.15} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[8, 18, 64]} />
+        <meshBasicMaterial color="#ff88cc" transparent opacity={0.08} side={THREE.DoubleSide} />
+      </mesh>
+      <pointLight intensity={0.5} color="#cc88ff" distance={50} />
+    </group>
+  )
+}
+
+// ─── Nebula clouds (always present, slow drift) ───
+function NebulaClouds({ color = '#8833aa' }) {
+  const groupRef = useRef()
+  const clouds = useMemo(() => {
+    return Array.from({ length: 8 }, (_, i) => ({
+      x: (Math.random() - 0.5) * 80,
+      y: (Math.random() - 0.5) * 40,
+      z: -60 - Math.random() * 40,
+      scale: 4 + Math.random() * 6,
+      speed: 0.2 + Math.random() * 0.3,
+      seed: i,
+    }))
+  }, [])
+  useFrame((_, delta) => {
+    if (!groupRef.current) return
+    groupRef.current.children.forEach((cloud, i) => {
+      cloud.position.z += clouds[i].speed * delta
+      cloud.position.x += Math.sin(delta * 0.2 + clouds[i].seed) * 0.05
+      if (cloud.position.z > 10) {
+        cloud.position.z = -100
+        cloud.position.x = (Math.random() - 0.5) * 80
+        cloud.position.y = (Math.random() - 0.5) * 40
+      }
+    })
+  })
+  return (
+    <group ref={groupRef}>
+      {clouds.map((c, i) => (
+        <mesh key={i} position={[c.x, c.y, c.z]}>
+          <sphereGeometry args={[c.scale, 12, 12]} />
+          <meshBasicMaterial color={color} transparent opacity={0.08} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// ─── Parallax stars (closer, faster) ───
+function CloseStars() {
+  const meshRef = useRef()
+  const dummy = useMemo(() => new THREE.Object3D(), [])
+  const COUNT = 200
+  const data = useMemo(() => {
+    return Array.from({ length: COUNT }, () => ({
+      x: (Math.random() - 0.5) * 80,
+      y: (Math.random() - 0.5) * 50,
+      z: -30 - Math.random() * 70,
+      speed: 8 + Math.random() * 12,
+      size: 0.08 + Math.random() * 0.15,
+    }))
+  }, [])
+  useFrame((_, delta) => {
+    if (!meshRef.current) return
+    data.forEach((s, i) => {
+      s.z += s.speed * delta
+      if (s.z > 20) {
+        s.z = -100
+        s.x = (Math.random() - 0.5) * 80
+        s.y = (Math.random() - 0.5) * 50
+      }
+      dummy.position.set(s.x, s.y, s.z)
+      dummy.scale.setScalar(s.size)
+      dummy.updateMatrix()
+      meshRef.current.setMatrixAt(i, dummy.matrix)
+    })
+    meshRef.current.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={meshRef} args={[null, null, COUNT]}>
+      <sphereGeometry args={[1, 4, 4]} />
+      <meshBasicMaterial color="#ffffff" />
+    </instancedMesh>
+  )
+}
+
 // ─── Main environment ───
 export function SpaceEnvironment() {
   const wave = useGameStore((s) => s.wave)
@@ -202,6 +301,10 @@ export function SpaceEnvironment() {
       <pointLight position={[0, 0, -30]} intensity={1.5} color={cfg.ambient.color} distance={100} />
       <pointLight position={[0, 5, 5]} intensity={0.5} color="#ffffff" distance={20} />
 
+      {/* Deep background: distant galaxy, nebula clouds */}
+      <DistantGalaxy />
+      <NebulaClouds color={cfg.nebulaColor} />
+
       {/* Background nebula sphere */}
       <Nebula color={cfg.nebulaColor} />
 
@@ -209,8 +312,11 @@ export function SpaceEnvironment() {
       {biome === 'planetOrbit' && <Planet />}
       {biome === 'enemyFleet' && <FleetShips />}
 
-      {/* Starfield */}
+      {/* Far starfield (slow) */}
       <Starfield density={cfg.starDensity} color={cfg.starColor} />
+
+      {/* Close parallax stars (fast) */}
+      <CloseStars />
     </>
   )
 }

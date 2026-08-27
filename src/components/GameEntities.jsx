@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useGameStore } from '../store'
+import { useGameStore, SHIP_STATS } from '../store'
 import { ENEMY_TYPES, pickEnemyType, createEnemyGeometry, getEnemyMaterial, shieldRingGeometry, shieldRingMaterial, getSniperBarrelMaterial, sniperBarrelGeometry } from './EnemyTypes'
 import { Boss, BOSS_DEFAULT_MAX_HP } from './Boss'
 
@@ -187,6 +187,7 @@ export function GameEntities({ isPlaying }) {
       if (window.__soundManager) window.__soundManager.playShoot()
       if (window.__triggerCameraShake) window.__triggerCameraShake(0.3)
       if (window.__triggerScreenFlash) window.__triggerScreenFlash('#ffaa00', 0.2)
+      window.__spreadFired = true
     }
 
     return () => {
@@ -295,15 +296,19 @@ export function GameEntities({ isPlaying }) {
     } // end boss-wave else block
 
     // Auto-shoot
+    // Auto-shoot: ~3 shots/sec baseline, scales with fireRate upgrade and ship type
     const fireRate = store.upgrades?.fireRate ?? 0
-    const SHOOT_COOLDOWN = Math.max(60, 180 - fireRate * 25)
+    const shipStats = SHIP_STATS[store.shipType] || SHIP_STATS.fighter
+    const SHOOT_COOLDOWN = Math.max(80, (320 - fireRate * 30) / shipStats.fireRate) // ship type affects fire rate
     if (!store.overheated && now - lastShotRef.current > SHOOT_COOLDOWN) {
       lastShotRef.current = now
       const playerPos = store.playerPosition
       if (playerPos && window.__gameFire) {
         window.__gameFire(playerPos)
         // Heat builds with auto-fire
-        store.addHeat?.(3)
+        store.addHeat?.(1.5)
+        // Track for accuracy
+        useGameStore.getState().incShotsFired?.()
       }
     } else if (store.overheated) {
       // Cool down
@@ -314,7 +319,7 @@ export function GameEntities({ isPlaying }) {
       }
     } else {
       // Cool slowly when not firing
-      store.coolHeat?.(delta * 4)
+      store.coolHeat?.(delta * 6)
     }
 
     // Move obstacles (with per-type AI)
@@ -381,10 +386,12 @@ export function GameEntities({ isPlaying }) {
         }
       }
 
-      // Off-screen → damage player
+      // Off-screen → damage player (skip if upgrade overlay open, player is invulnerable)
       if (o.posRef.current[2] > 10) {
         o.active = false
-        store.takeDamage(o.type === 'asteroid' ? 15 : 20)
+        if (!store.pendingUpgrade) {
+          store.takeDamage(o.type === 'asteroid' ? 15 : 20)
+        }
         obstaclesChanged = true
         if (window.__soundManager) window.__soundManager.playHit()
         if (window.__triggerCameraShake) window.__triggerCameraShake(0.8)
@@ -423,6 +430,7 @@ export function GameEntities({ isPlaying }) {
           b.active = false
           o.hp -= b.damage
           o.lastHitTime.current = performance.now()
+          useGameStore.getState().incShotsHit?.()
           if (o.hp <= 0) {
             o.active = false
             const isCrit = Math.random() < critChance

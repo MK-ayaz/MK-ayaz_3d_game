@@ -1,24 +1,26 @@
 import React, { useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useGameStore } from '../store'
+import { useGameStore, SHIP_STATS } from '../store'
 import { ChargedShot } from './ChargedShot'
 
 const PLAYER_SPEED_BASE = 15
 const ARENA_BOUNDS_X = 11
 const ARENA_BOUNDS_Y = 6
+const PLAYER_Z = 5 // start position toward camera so player is visible
 const CHARGE_TIME = 1.2 // seconds to full charge
 const CHARGE_THRESHOLD = 0.3 // min charge to fire a spread
 
 export function PlayerShip({ isPlaying }) {
   const groupRef = useRef()
-  const posRef = useRef([0, 0, 0])
+  const posRef = useRef([0, 0, PLAYER_Z])
   const keysRef = useRef({})
   const chargeRef = useRef(0) // 0..1
   const spaceHeldRef = useRef(false)
 
   // Subscribe to upgrades for player speed
-  const speedMultiplier = useGameStore((s) => s.upgrades?.moveSpeed ?? 1)
+  const moveSpeedUpgrade = useGameStore((s) => s.upgrades?.moveSpeed ?? 0)
+  const shipType = useGameStore((s) => s.shipType)
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -67,14 +69,35 @@ export function PlayerShip({ isPlaying }) {
       return
     }
 
+    // Merge mobile keys into keysRef
+    if (window.__keys) {
+      Object.assign(keysRef.current, window.__keys)
+    }
+
     const keys = keysRef.current
     const pos = posRef.current
-    const speed = PLAYER_SPEED_BASE * speedMultiplier
+    const shipStats = SHIP_STATS[shipType] || SHIP_STATS.fighter
+    const speed = PLAYER_SPEED_BASE * shipStats.speed * (1 + moveSpeedUpgrade * 0.1)
 
-    if (keys['ArrowLeft'] || keys['KeyA']) pos[0] -= speed * delta
-    if (keys['ArrowRight'] || keys['KeyD']) pos[0] += speed * delta
-    if (keys['ArrowUp'] || keys['KeyW']) pos[1] += speed * delta
-    if (keys['ArrowDown'] || keys['KeyS']) pos[1] -= speed * delta
+    // Use keybinds from store, falling back to defaults
+    const kb = useGameStore.getState().keybinds
+    const upKey = kb?.up || 'ArrowUp'
+    const downKey = kb?.down || 'ArrowDown'
+    const leftKey = kb?.left || 'ArrowLeft'
+    const rightKey = kb?.right || 'ArrowRight'
+
+    if (keys[leftKey] || keys['KeyA']) pos[0] -= speed * delta
+    if (keys[rightKey] || keys['KeyD']) pos[0] += speed * delta
+    if (keys[upKey] || keys['KeyW']) pos[1] += speed * delta
+    if (keys[downKey] || keys['KeyS']) pos[1] -= speed * delta
+
+    // Track movement for tutorial
+    if (keys['ArrowLeft'] || keys['ArrowRight'] || keys['ArrowUp'] || keys['ArrowDown']) {
+      window.__lastKey = { ...(window.__lastKey || {}), arrows: true }
+    }
+    if (keys['KeyA'] || keys['KeyW'] || keys['KeyS'] || keys['KeyD']) {
+      window.__lastKey = { ...(window.__lastKey || {}), wasd: true }
+    }
 
     pos[0] = Math.max(-ARENA_BOUNDS_X, Math.min(ARENA_BOUNDS_X, pos[0]))
     pos[1] = Math.max(-ARENA_BOUNDS_Y, Math.min(ARENA_BOUNDS_Y, pos[1]))
@@ -103,46 +126,127 @@ export function PlayerShip({ isPlaying }) {
     }
   })
 
+  const ShipBody = () => {
+    if (shipType === 'interceptor') {
+      // Sleek dart-shape
+      return (
+        <>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.3, 2.0, 6]} />
+            <meshStandardMaterial color="#00ff88" metalness={0.9} roughness={0.15} emissive="#005522" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[0, 0.15, -0.4]}>
+            <sphereGeometry args={[0.18, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#88ffcc" metalness={0.95} roughness={0.05} transparent opacity={0.7} emissive="#00ff88" emissiveIntensity={0.5} />
+          </mesh>
+          {/* Swept-back wings */}
+          <mesh position={[-0.5, -0.05, 0.3]} rotation={[0, 0, 0.4]}>
+            <boxGeometry args={[0.7, 0.05, 0.4]} />
+            <meshStandardMaterial color="#00aa55" metalness={0.8} roughness={0.2} emissive="#003322" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[0.5, -0.05, 0.3]} rotation={[0, 0, -0.4]}>
+            <boxGeometry args={[0.7, 0.05, 0.4]} />
+            <meshStandardMaterial color="#00aa55" metalness={0.8} roughness={0.2} emissive="#003322" emissiveIntensity={0.3} />
+          </mesh>
+          {/* Single intense engine */}
+          <mesh position={[0, -0.05, 0.9]}>
+            <sphereGeometry args={[0.15, 8, 8]} />
+            <meshStandardMaterial color="#00ffaa" emissive="#00ffaa" emissiveIntensity={6} />
+          </mesh>
+        </>
+      )
+    }
+    if (shipType === 'destroyer') {
+      // Bulky armored
+      return (
+        <>
+          {/* Twin hulls */}
+          <mesh position={[-0.4, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.35, 1.6, 4]} />
+            <meshStandardMaterial color="#ff8800" metalness={0.6} roughness={0.4} emissive="#662200" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[0.4, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <coneGeometry args={[0.35, 1.6, 4]} />
+            <meshStandardMaterial color="#ff8800" metalness={0.6} roughness={0.4} emissive="#662200" emissiveIntensity={0.3} />
+          </mesh>
+          {/* Central body */}
+          <mesh>
+            <boxGeometry args={[0.6, 0.4, 1.6]} />
+            <meshStandardMaterial color="#aa5500" metalness={0.7} roughness={0.3} emissive="#442200" emissiveIntensity={0.2} />
+          </mesh>
+          {/* Wide wings */}
+          <mesh position={[-0.9, -0.05, 0.1]} rotation={[0, 0, 0.1]}>
+            <boxGeometry args={[1.0, 0.08, 0.5]} />
+            <meshStandardMaterial color="#cc6600" metalness={0.6} roughness={0.4} emissive="#442200" emissiveIntensity={0.2} />
+          </mesh>
+          <mesh position={[0.9, -0.05, 0.1]} rotation={[0, 0, -0.1]}>
+            <boxGeometry args={[1.0, 0.08, 0.5]} />
+            <meshStandardMaterial color="#cc6600" metalness={0.6} roughness={0.4} emissive="#442200" emissiveIntensity={0.2} />
+          </mesh>
+          {/* Twin engines */}
+          <mesh position={[-0.4, -0.05, 0.8]}>
+            <sphereGeometry args={[0.12, 8, 8]} />
+            <meshStandardMaterial color="#ff4400" emissive="#ff2200" emissiveIntensity={5} />
+          </mesh>
+          <mesh position={[0.4, -0.05, 0.8]}>
+            <sphereGeometry args={[0.12, 8, 8]} />
+            <meshStandardMaterial color="#ff4400" emissive="#ff2200" emissiveIntensity={5} />
+          </mesh>
+        </>
+      )
+    }
+    // Fighter (default)
+    return (
+      <>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.5, 1.8, 4]} />
+          <meshStandardMaterial color="#00aaff" metalness={0.8} roughness={0.2} emissive="#0044aa" emissiveIntensity={0.3} />
+        </mesh>
+        <mesh position={[0, 0.2, -0.3]}>
+          <sphereGeometry args={[0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#66ddff" metalness={0.9} roughness={0.1} transparent opacity={0.7} emissive="#00aaff" emissiveIntensity={0.5} />
+        </mesh>
+        <mesh position={[-0.7, -0.05, 0.1]} rotation={[0, 0, 0.15]}>
+          <boxGeometry args={[0.9, 0.06, 0.4]} />
+          <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} emissive="#003366" emissiveIntensity={0.2} />
+        </mesh>
+        <mesh position={[0.7, -0.05, 0.1]} rotation={[0, 0, -0.15]}>
+          <boxGeometry args={[0.9, 0.06, 0.4]} />
+          <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} emissive="#003366" emissiveIntensity={0.2} />
+        </mesh>
+        <mesh position={[-0.3, -0.05, 0.8]}>
+          <sphereGeometry args={[0.1, 8, 8]} />
+          <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={4} />
+        </mesh>
+        <mesh position={[0.3, -0.05, 0.8]}>
+          <sphereGeometry args={[0.1, 8, 8]} />
+          <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={4} />
+        </mesh>
+      </>
+    )
+  }
+
+  const ringColor = shipType === 'interceptor' ? '#00ff88' : shipType === 'destroyer' ? '#ff8800' : '#00ffff'
+  const lightColor = shipType === 'interceptor' ? '#00ff88' : shipType === 'destroyer' ? '#ffaa00' : '#00aaff'
+
   return (
-    <group ref={groupRef} position={[0, 0, 0]}>
-      {/* Main hull - cone pointing forward (-Z) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.5, 1.8, 4]} />
-        <meshStandardMaterial color="#00aaff" metalness={0.8} roughness={0.2} emissive="#0044aa" emissiveIntensity={0.3} />
-      </mesh>
-
-      {/* Cockpit dome - front (-Z) */}
-      <mesh position={[0, 0.2, -0.3]}>
-        <sphereGeometry args={[0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#66ddff" metalness={0.9} roughness={0.1} transparent opacity={0.7} emissive="#00aaff" emissiveIntensity={0.5} />
-      </mesh>
-
-      {/* Left wing */}
-      <mesh position={[-0.7, -0.05, 0.1]} rotation={[0, 0, 0.15]}>
-        <boxGeometry args={[0.9, 0.06, 0.4]} />
-        <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} emissive="#003366" emissiveIntensity={0.2} />
-      </mesh>
-
-      {/* Right wing */}
-      <mesh position={[0.7, -0.05, 0.1]} rotation={[0, 0, -0.15]}>
-        <boxGeometry args={[0.9, 0.06, 0.4]} />
-        <meshStandardMaterial color="#0077cc" metalness={0.7} roughness={0.3} emissive="#003366" emissiveIntensity={0.2} />
-      </mesh>
-
-      {/* Engine glow left - back (+Z) */}
-      <mesh position={[-0.3, -0.05, 0.8]}>
-        <sphereGeometry args={[0.1, 8, 8]} />
-        <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={4} />
-      </mesh>
-
-      {/* Engine glow right - back (+Z) */}
-      <mesh position={[0.3, -0.05, 0.8]}>
-        <sphereGeometry args={[0.1, 8, 8]} />
-        <meshStandardMaterial color="#ff6600" emissive="#ff4400" emissiveIntensity={4} />
-      </mesh>
+    <group ref={groupRef} position={[0, 0, PLAYER_Z]}>
+      <ShipBody />
 
       {/* Point light on ship */}
-      <pointLight position={[0, 0, 1]} intensity={1} color="#00aaff" distance={8} />
+      <pointLight position={[0, 0, 1]} intensity={1.5} color={lightColor} distance={10} />
+
+      {/* Bright glow ring under the player so they're always visible */}
+      <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.7, 1.0, 32]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.4} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+      {/* Reticle / crosshair in front of player showing where bullets go */}
+      <mesh position={[0, 0, -3]}>
+        <ringGeometry args={[0.3, 0.35, 16]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.5} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
 
       {/* Charge visual */}
       <ChargedShot />

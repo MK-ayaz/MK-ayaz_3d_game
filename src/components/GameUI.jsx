@@ -3,6 +3,15 @@ import { useGameStore } from '../store'
 import { UpgradeScreen } from './UpgradeScreen'
 import { PauseMenu } from './PauseMenu'
 import { IntroScreen } from './IntroScreen'
+import { MainMenu } from './MainMenu'
+import { TutorialOverlay } from './TutorialOverlay'
+import { AchievementsPanel } from './AchievementsPanel'
+import { StatsPanel } from './StatsPanel'
+import { SettingsPanel } from './SettingsPanel'
+import { DailyChallengeModal } from './DailyChallengeModal'
+import { Minimap } from './Minimap'
+import { StatsHUD } from './StatsHUD'
+import { MobileControls } from './MobileControls'
 
 export function GameUI() {
   const score = useGameStore((s) => s.score)
@@ -27,7 +36,9 @@ export function GameUI() {
   const muted = useGameStore((s) => s.muted)
   const setMuted = useGameStore((s) => s.setMuted)
   const volume = useGameStore((s) => s.volume)
+  const bombs = useGameStore((s) => s.bombs)
   const [chargeValue, setChargeValue] = useState(0)
+  const [modal, setModal] = useState(null) // 'achievements' | 'settings' | 'daily' | 'stats' | null
 
   // Esc to pause/resume
   useEffect(() => {
@@ -191,27 +202,55 @@ export function GameUI() {
         </div>
       )}
 
-      {/* Heat bar */}
+      {/* Heat bar + bomb counter */}
       {gameState === 'playing' && (
         <div style={{
           position: 'absolute',
           bottom: 20,
           right: 20,
-          width: 100,
-          height: 6,
-          background: 'rgba(255,255,255,0.1)',
-          borderRadius: 3,
-          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
         }}>
+          {/* Bomb counter */}
+          <div
+            onClick={() => window.__triggerBomb?.()}
+            style={{
+              width: 36, height: 36,
+              borderRadius: '50%',
+              border: '2px solid #ffaa00',
+              background: bombs > 0
+                ? 'radial-gradient(circle, #ffdd00 0%, #ff6600 100%)'
+                : 'rgba(100,100,100,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: bombs > 0 ? 'pointer' : 'not-allowed',
+              boxShadow: bombs > 0 ? '0 0 12px #ffaa00' : 'none',
+              color: bombs > 0 ? '#000' : '#666',
+              fontSize: 14, fontWeight: 'bold',
+              transition: 'all 0.2s',
+            }}
+            title="Press B to detonate"
+          >
+            {bombs}💣
+          </div>
+          {/* Heat bar */}
           <div style={{
-            width: `${heat}%`,
-            height: '100%',
-            background: overheated
-              ? 'linear-gradient(90deg, #ff0000, #ff4400)'
-              : 'linear-gradient(90deg, #ffaa00, #ff6600)',
-            transition: overheated ? 'width 2s linear' : 'width 0.1s linear',
-            boxShadow: overheated ? '0 0 8px #ff0000' : 'none',
-          }} />
+            width: 100,
+            height: 6,
+            background: 'rgba(255,255,255,0.1)',
+            borderRadius: 3,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${heat}%`,
+              height: '100%',
+              background: overheated
+                ? 'linear-gradient(90deg, #ff0000, #ff4400)'
+                : 'linear-gradient(90deg, #ffaa00, #ff6600)',
+              transition: overheated ? 'width 2s linear' : 'width 0.1s linear',
+              boxShadow: overheated ? '0 0 8px #ff0000' : 'none',
+            }} />
+          </div>
         </div>
       )}
       {gameState === 'playing' && overheated && (
@@ -434,68 +473,13 @@ export function GameUI() {
 
       {/* Main Menu */}
       {gameState === 'menu' && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'radial-gradient(ellipse at center, rgba(0,20,60,0.9) 0%, rgba(0,0,0,0.95) 100%)',
-          pointerEvents: 'auto',
-        }}>
-          <h1 style={{
-            fontSize: 64,
-            fontWeight: 'bold',
-            color: '#00ccff',
-            textShadow: '0 0 30px #00aaff, 0 0 60px #0066ff',
-            marginBottom: 8,
-            letterSpacing: 4,
-          }}>
-            SPACE SHOOTER
-          </h1>
-          <p style={{
-            color: '#88aacc',
-            fontSize: 18,
-            marginBottom: 40,
-            letterSpacing: 2,
-          }}>
-            3D WEB GAME
-          </p>
-
-          <div style={{
-            color: '#aaa',
-            fontSize: 14,
-            marginBottom: 30,
-            textAlign: 'center',
-            lineHeight: 1.8,
-          }}>
-            <div>WASD / Arrow Keys — Move</div>
-            <div>SPACE — Shoot</div>
-            <div style={{ marginTop: 8, color: '#ff8866' }}>Destroy enemies and dodge asteroids!</div>
-          </div>
-
-          <button
-            onClick={startGame}
-            style={{
-              padding: '16px 48px',
-              fontSize: 22,
-              fontWeight: 'bold',
-              color: '#001122',
-              background: 'linear-gradient(135deg, #00ccff, #0088ff)',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-              boxShadow: '0 0 30px rgba(0,170,255,0.5)',
-              letterSpacing: 2,
-              transition: 'transform 0.2s',
-            }}
-            onMouseEnter={(e) => (e.target.style.transform = 'scale(1.05)')}
-            onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
-          >
-            START GAME
-          </button>
-        </div>
+        <MainMenu
+          onStart={startGame}
+          onShowAchievements={() => setModal('achievements')}
+          onShowSettings={() => setModal('settings')}
+          onShowDaily={() => setModal('daily')}
+          onShowStats={() => setModal('stats')}
+        />
       )}
 
       {/* Game Over */}
@@ -600,6 +584,14 @@ export function GameUI() {
       <UpgradeScreen />
       <PauseMenu />
       <IntroScreen />
+      <TutorialOverlay />
+      <Minimap />
+      <StatsHUD />
+      <MobileControls />
+      {modal === 'achievements' && <AchievementsPanel onClose={() => setModal(null)} />}
+      {modal === 'stats' && <StatsPanel onClose={() => setModal(null)} />}
+      {modal === 'settings' && <SettingsPanel onClose={() => setModal(null)} />}
+      {modal === 'daily' && <DailyChallengeModal onClose={() => setModal(null)} />}
     </div>
   )
 }

@@ -42,6 +42,7 @@ export function NearMissDetector() {
         window.__playerInvincibleUntil = now + 600
         useGameStore.getState().addScore(50)
         useGameStore.getState().triggerNearMiss?.()
+        window.__nearMissTriggered = true
         setFlash(now)
         if (window.__soundManager) window.__soundManager.playPowerUp?.()
         if (window.__triggerScreenFlash) window.__triggerScreenFlash('#00ffff', 0.1)
