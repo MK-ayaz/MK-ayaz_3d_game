@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useGameStore } from '../store'
+import { UpgradeScreen } from './UpgradeScreen'
+import { PauseMenu } from './PauseMenu'
+import { IntroScreen } from './IntroScreen'
 
 export function GameUI() {
   const score = useGameStore((s) => s.score)
@@ -21,6 +24,9 @@ export function GameUI() {
   const heat = useGameStore((s) => s.heat)
   const overheated = useGameStore((s) => s.overheated)
   const bossActive = useGameStore((s) => s.bossActive)
+  const muted = useGameStore((s) => s.muted)
+  const setMuted = useGameStore((s) => s.setMuted)
+  const volume = useGameStore((s) => s.volume)
   const [chargeValue, setChargeValue] = useState(0)
 
   // Esc to pause/resume
@@ -221,6 +227,43 @@ export function GameUI() {
         }}>
           OVERHEAT
         </div>
+      )}
+
+      {/* Mute button (top right) */}
+      {(gameState === 'playing' || gameState === 'paused') && (
+        <button
+          onClick={() => {
+            const newMuted = !muted
+            setMuted(newMuted)
+            if (window.__soundManager) {
+              window.__soundManager.setVolume(newMuted ? 0 : volume)
+            }
+          }}
+          style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.3)',
+            background: 'rgba(0,0,0,0.5)',
+            color: '#fff',
+            fontSize: 18,
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+            zIndex: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.7)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.5)')}
+          title={muted ? 'Unmute' : 'Mute'}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
       )}
 
       {/* Boss banner */}
@@ -480,52 +523,83 @@ export function GameUI() {
 
           <div style={{
             color: '#ffaa88',
-            fontSize: 24,
+            fontSize: 28,
             marginBottom: 8,
+            fontWeight: 'bold',
+            textShadow: '0 0 10px #ff4400',
           }}>
             SCORE: {score}
           </div>
+          {score >= highScore && score > 0 && (
+            <div style={{
+              color: '#ffd700',
+              fontSize: 18,
+              marginBottom: 12,
+              fontWeight: 'bold',
+              textShadow: '0 0 15px #ffd700',
+              animation: 'pulse 1.5s infinite',
+            }}>
+              ★ NEW HIGH SCORE ★
+            </div>
+          )}
           <div style={{
-            color: '#cc8866',
-            fontSize: 18,
-            marginBottom: 8,
+            display: 'grid',
+            gridTemplateColumns: 'auto auto',
+            gap: '6px 20px',
+            marginBottom: 12,
+            fontSize: 15,
           }}>
-            WAVE: {wave}
-          </div>
-          <div style={{
-            color: '#88aaff',
-            fontSize: 16,
-            marginBottom: 8,
-          }}>
-            MAX COMBO: {maxCombo}x
-          </div>
-          <div style={{
-            color: '#666666',
-            fontSize: 14,
-            marginBottom: 40,
-          }}>
-            HIGH SCORE: {highScore}
+            <span style={{ color: '#888' }}>WAVE REACHED</span>
+            <span style={{ color: '#ffaa88', fontWeight: 'bold' }}>{wave}</span>
+            <span style={{ color: '#888' }}>ENEMIES DESTROYED</span>
+            <span style={{ color: '#ffaa88', fontWeight: 'bold' }}>{useGameStore.getState().enemiesDestroyed}</span>
+            <span style={{ color: '#888' }}>MAX COMBO</span>
+            <span style={{ color: '#88aaff', fontWeight: 'bold' }}>{maxCombo}x</span>
+            <span style={{ color: '#888' }}>HIGH SCORE</span>
+            <span style={{ color: '#666', fontWeight: 'bold' }}>{highScore}</span>
           </div>
 
-          <button
-            onClick={startGame}
-            style={{
-              padding: '16px 48px',
-              fontSize: 22,
-              fontWeight: 'bold',
-              color: '#ffffff',
-              background: 'linear-gradient(135deg, #ff4444, #cc2222)',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-              boxShadow: '0 0 30px rgba(255,0,0,0.5)',
-              letterSpacing: 2,
-            }}
-          >
-            PLAY AGAIN
-          </button>
+          <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+            <button
+              onClick={startGame}
+              style={{
+                padding: '14px 36px',
+                fontSize: 20,
+                fontWeight: 'bold',
+                color: '#ffffff',
+                background: 'linear-gradient(135deg, #ff4444, #cc2222)',
+                border: 'none',
+                borderRadius: 8,
+                cursor: 'pointer',
+                boxShadow: '0 0 30px rgba(255,0,0,0.5)',
+                letterSpacing: 2,
+              }}
+            >
+              PLAY AGAIN
+            </button>
+            <button
+              onClick={resetGame}
+              style={{
+                padding: '14px 36px',
+                fontSize: 16,
+                fontWeight: 'bold',
+                color: '#aaa',
+                background: 'transparent',
+                border: '1px solid #666',
+                borderRadius: 8,
+                cursor: 'pointer',
+                letterSpacing: 2,
+              }}
+            >
+              MAIN MENU
+            </button>
+          </div>
         </div>
       )}
+
+      <UpgradeScreen />
+      <PauseMenu />
+      <IntroScreen />
     </div>
   )
 }

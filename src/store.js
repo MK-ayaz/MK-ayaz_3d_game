@@ -87,6 +87,10 @@ const INITIAL_STATE = {
   // Boss state
   bossActive: false,
   bossId: 0,
+  // Settings
+  muted: false,
+  volume: 0.3,
+  bloomEnabled: true,
 }
 
 export const useGameStore = create((set, get) => ({
@@ -196,30 +200,30 @@ export const useGameStore = create((set, get) => ({
   },
 
   heal: (amount) => set((state) => ({
-    health: Math.min(100, state.health + amount),
+    health: Math.min(state.maxHealth, state.health + amount),
   })),
 
   nextWave: () => set((state) => {
     const newWave = state.wave + 1
-    
+
     // Check wave achievements
     const newUnlocked = [...state.unlockedAchievements]
     const achievements = state.achievements
-    
+
     if (!achievements.includes('wave_survivor') && newWave >= 5) {
       newUnlocked.push('wave_survivor')
       achievements.push('wave_survivor')
       saveAchievements(achievements)
       if (window.__soundManager) window.__soundManager.playAchievement()
     }
-    
+
     if (!achievements.includes('wave_master') && newWave >= 10) {
       newUnlocked.push('wave_master')
       achievements.push('wave_master')
       saveAchievements(achievements)
       if (window.__soundManager) window.__soundManager.playAchievement()
     }
-    
+
     // Check perfect game achievement
     if (!achievements.includes('perfect_game') && state.waveDamageTaken === 0) {
       newUnlocked.push('perfect_game')
@@ -227,16 +231,17 @@ export const useGameStore = create((set, get) => ({
       saveAchievements(achievements)
       if (window.__soundManager) window.__soundManager.playAchievement()
     }
-    
+
     // Heal player slightly on wave completion
-    const healAmount = Math.min(20, 100 - state.health)
-    
+    const healAmount = Math.min(20, state.maxHealth - state.health)
+
     return {
       wave: newWave,
       unlockedAchievements: newUnlocked,
       achievements,
       waveDamageTaken: 0, // Reset damage counter for new wave
-      health: Math.min(100, state.health + healAmount), // Small heal on wave completion
+      health: Math.min(state.maxHealth, state.health + healAmount), // Small heal on wave completion
+      gameState: 'upgrading', // Show upgrade screen between waves
     }
   }),
 
@@ -245,27 +250,34 @@ export const useGameStore = create((set, get) => ({
   activatePowerUp: (type, duration = 5000) => {
     const state = get()
     const newPowerUpsCollected = state.powerUpsCollected + 1
-    
+
     // Check power-up achievement
     const newUnlocked = [...state.unlockedAchievements]
     const achievements = state.achievements
-    
+
     if (!achievements.includes('power_collector') && newPowerUpsCollected >= 5) {
       newUnlocked.push('power_collector')
       achievements.push('power_collector')
       saveAchievements(achievements)
     }
-    
-    set({ 
-      activePowerUp: type, 
+
+    set({
+      activePowerUp: type,
       powerUpTimer: Date.now() + duration,
       powerUpsCollected: newPowerUpsCollected,
       unlockedAchievements: newUnlocked,
       achievements,
     })
-    
+
     if (type === 'health') {
       get().heal(30)
+    }
+    if (type === 'slowmo') {
+      window.__timeScale = 0.4
+      setTimeout(() => { window.__timeScale = 1 }, duration)
+    }
+    if (type === 'blackhole') {
+      window.__spawnBlackHole?.([...state.playerPosition])
     }
   },
 
@@ -309,6 +321,11 @@ export const useGameStore = create((set, get) => ({
 
   // Boss state
   setBossActive: (active) => set({ bossActive: active }),
+
+  // Settings (volume/bloom toggles)
+  setMuted: (muted) => set({ muted }),
+  setVolume: (vol) => set({ volume: vol }),
+  setBloomEnabled: (enabled) => set({ bloomEnabled: enabled }),
 
   getAchievements: () => get().achievements,
 }))

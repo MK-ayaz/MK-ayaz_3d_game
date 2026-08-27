@@ -9,6 +9,9 @@ import { SoundSystem } from './components/SoundSystem'
 import { PowerUps } from './components/PowerUps'
 import { PostFX } from './components/PostFX'
 import { EnemyProjectiles } from './components/EnemyProjectiles'
+import { PlayerTrail } from './components/PlayerTrail'
+import { DamageNumbers } from './components/DamageNumbers'
+import { NearMissDetector } from './components/NearMissDetector'
 import { useGameStore } from './store'
 
 function CameraShake() {
@@ -96,6 +99,9 @@ function Scene() {
       <ScreenFlash />
       <SpaceEnvironment />
       <ParticleSystem />
+      <PlayerTrail />
+      <DamageNumbers />
+      <NearMissDetector />
       <PowerUps isPlaying={isPlaying} />
       <PlayerShip isPlaying={isPlaying} />
       <GameEntities isPlaying={isPlaying} />
@@ -123,6 +129,17 @@ export default function App() {
       unsub()
       delete window.__playerHit
     }
+  }, [])
+
+  // Auto-pause when tab is hidden
+  React.useEffect(() => {
+    const handleVis = () => {
+      if (document.hidden && useGameStore.getState().gameState === 'playing') {
+        useGameStore.getState().pauseGame()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVis)
+    return () => document.removeEventListener('visibilitychange', handleVis)
   }, [])
 
   return (

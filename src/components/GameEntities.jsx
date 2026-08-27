@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '../store'
 import { ENEMY_TYPES, pickEnemyType, createEnemyGeometry, getEnemyMaterial, shieldRingGeometry, shieldRingMaterial, getSniperBarrelMaterial, sniperBarrelGeometry } from './EnemyTypes'
+import { Boss, BOSS_DEFAULT_MAX_HP } from './Boss'
 
 const ENEMY_SPAWN_DISTANCE = 50
 const ARENA_SIZE = 12
@@ -126,7 +127,9 @@ export function GameEntities({ isPlaying }) {
   const nextIdRef = useRef(0)
   const lastSpawnRef = useRef(0)
   const lastShotRef = useRef(0)
+  const bossStateRef = useRef({ active: false, id: 0, spawnWave: 0, defeated: false })
   const [renderKey, setRenderKey] = useState(0)
+  const [bossKey, setBossKey] = useState(0)
 
   const spawnBullet = useCallback((pos, opts = {}) => {
     const id = nextIdRef.current++
@@ -210,7 +213,35 @@ export function GameEntities({ isPlaying }) {
       store.nextWave()
     }
 
-    // Spawn enemies
+    // Boss wave detection: every 5 waves (5, 10, 15...)
+    const isBossWave = currentWave > 0 && currentWave % 5 === 0
+    if (isBossWave && !bossStateRef.current.active && !bossStateRef.current.defeated) {
+      // Clear field of regular enemies, spawn boss
+      ents.obstacles = ents.obstacles.filter((o) => o.type === 'asteroid') // Keep asteroids only
+      bossStateRef.current.active = true
+      bossStateRef.current.spawnWave = currentWave
+      bossStateRef.current.id = nextIdRef.current++
+      store.setBossActive(true)
+      setBossKey((k) => k + 1)
+      setRenderKey((k) => k + 1)
+      if (window.__soundManager) {
+        window.__soundManager.startBossMusic?.()
+      }
+      if (window.__triggerScreenFlash) {
+        window.__triggerScreenFlash('#ff00ff', 0.5)
+      }
+    }
+    if (!isBossWave && bossStateRef.current.active) {
+      // Wave advanced past boss
+      bossStateRef.current.active = false
+      bossStateRef.current.defeated = false
+      store.setBossActive(false)
+    }
+
+    // Spawn enemies (skip during boss wave)
+    if (bossStateRef.current.active) {
+      // Don't spawn regular enemies while boss is alive
+    } else {
     const speed = ENEMY_SPEED_BASE + currentWave * 1.5
     const spawnInterval = Math.max(0.4, 2.2 - currentWave * 0.2)
     if (now - lastSpawnRef.current > spawnInterval * 1000) {
@@ -261,6 +292,7 @@ export function GameEntities({ isPlaying }) {
       }
       setRenderKey((k) => k + 1)
     }
+    } // end boss-wave else block
 
     // Auto-shoot
     const fireRate = store.upgrades?.fireRate ?? 0
@@ -402,6 +434,13 @@ export function GameEntities({ isPlaying }) {
               store.heal(b.damage * lifesteal)
             }
 
+            // Floating damage number
+            if (window.__triggerDamageNumber) {
+              const color = isCrit ? '#ff00ff' : '#ffff00'
+              const text = isCrit ? `CRIT ${dmg * baseScore}` : `+${dmg * baseScore}`
+              window.__triggerDamageNumber(o.posRef.current, text, color, isCrit)
+            }
+
             if (window.__triggerExplosion) {
               const explosionColor = o.type === 'asteroid' ? '#ffaa00' :
                                     (cfg?.visual?.emissive || '#ff4444')
@@ -433,12 +472,55 @@ export function GameEntities({ isPlaying }) {
     if (ents.obstacles.length !== prevObsCount || ents.bullets.length !== prevBulCount || obstaclesChanged) {
       setRenderKey((k) => k + 1)
     }
+
+    // Expose enemy list for NearMissDetector
+    window.__gameEnemies = ents.obstacles.filter((o) => o.type === 'enemy').map((o) => ({
+      active: o.active,
+      pos: o.posRef.current,
+    }))
+
+    // Boss damage check - check if any bullet is near the boss
+    if (bossStateRef.current.active && window.__bossCheckHit) {
+      ents.bullets.forEach((b) => {
+        if (!b.active) return
+        window.__bossCheckHit({
+          x: b.posRef.current[0],
+          y: b.posRef.current[1],
+          z: b.posRef.current[2],
+          damage: b.damage,
+        })
+      })
+    }
   })
 
   const ents = entitiesRef.current
 
+  const handleBossDefeat = useCallback(() => {
+    bossStateRef.current.active = false
+    bossStateRef.current.defeated = true
+    useGameStore.getState().addScore(500)
+    useGameStore.getState().setBossActive(false)
+    setBossKey((k) => k + 1)
+    if (window.__triggerExplosion) {
+      window.__triggerExplosion([0, 0, -30], '#ff00ff', 100)
+    }
+    if (window.__triggerScreenFlash) {
+      window.__triggerScreenFlash('#ff00ff', 0.6)
+    }
+    if (window.__triggerCameraShake) {
+      window.__triggerCameraShake(1.5)
+    }
+    if (window.__soundManager) {
+      window.__soundManager.playExplosion?.()
+      window.__soundManager.stopBossMusic?.()
+    }
+  }, [])
+
   return (
     <>
+      {bossStateRef.current.active && (
+        <Boss key={bossKey} bossId={bossStateRef.current.id} onDefeat={handleBossDefeat} />
+      )}
       {ents.obstacles.map((o) =>
         o.type === 'asteroid' ? (
           <AsteroidMesh

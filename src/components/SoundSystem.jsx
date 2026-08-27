@@ -202,6 +202,54 @@ class SoundManager {
       this.musicGain.gain.value = value
     }
   }
+
+  startBossMusic() {
+    if (!this.initialized) this.init()
+    if (this.bossMusicPlaying) return
+    this.bossMusicPlaying = true
+    // Heavy bass drone
+    const bassOsc = this.context.createOscillator()
+    const bassGain = this.context.createGain()
+    bassOsc.type = 'sawtooth'
+    bassOsc.frequency.value = 55 // A1
+    bassGain.gain.value = 0.2
+    const bassFilter = this.context.createBiquadFilter()
+    bassFilter.type = 'lowpass'
+    bassFilter.frequency.value = 300
+    bassOsc.connect(bassFilter)
+    bassFilter.connect(bassGain)
+    bassGain.connect(this.musicGain)
+    bassOsc.start()
+    this.bossBassOsc = bassOsc
+    this.bossBassGain = bassGain
+
+    // Aggressive pulse
+    this.bossPulseInterval = setInterval(() => {
+      if (!this.bossMusicPlaying) return
+      const osc = this.context.createOscillator()
+      const gain = this.context.createGain()
+      osc.type = 'square'
+      osc.frequency.value = 110
+      gain.gain.setValueAtTime(0.15, this.context.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.2)
+      osc.connect(gain)
+      gain.connect(this.musicGain)
+      osc.start()
+      osc.stop(this.context.currentTime + 0.2)
+    }, 400)
+  }
+
+  stopBossMusic() {
+    this.bossMusicPlaying = false
+    if (this.bossBassOsc) {
+      try { this.bossBassOsc.stop() } catch {}
+      this.bossBassOsc = null
+    }
+    if (this.bossPulseInterval) {
+      clearInterval(this.bossPulseInterval)
+      this.bossPulseInterval = null
+    }
+  }
 }
 
 const soundManager = new SoundManager()
@@ -252,6 +300,18 @@ export function SoundSystem() {
     const unsubscribe = useGameStore.subscribe(handleStateChange)
 
     return () => unsubscribe()
+  }, [])
+
+  // Music intensity layer - subscribes to comboMultiplier
+  useEffect(() => {
+    const unsub = useGameStore.subscribe((state) => {
+      if (soundManager.setMusicVolume && state.gameState === 'playing') {
+        // Music louder as combo increases
+        const intensity = Math.min(1, 0.15 + state.comboMultiplier * 0.06)
+        soundManager.setMusicVolume(intensity)
+      }
+    })
+    return unsub
   }, [])
 
   return null

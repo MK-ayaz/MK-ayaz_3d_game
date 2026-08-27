@@ -3,11 +3,13 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '../store'
 
-const POWER_UP_TYPES = ['health', 'speed', 'multishot']
+const POWER_UP_TYPES = ['health', 'speed', 'multishot', 'slowmo', 'blackhole']
 const POWER_UP_COLORS = {
   health: '#00ff88',
   speed: '#00ccff',
-  multishot: '#ffaa00'
+  multishot: '#ffaa00',
+  slowmo: '#cc66ff',
+  blackhole: '#ff0066'
 }
 
 function PowerUpMesh({ position, type, onCollect }) {

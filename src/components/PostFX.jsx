@@ -12,6 +12,7 @@ import { useGameStore } from '../store'
 export function PostFX() {
   const gameState = useGameStore((s) => s.gameState)
   const comboMultiplier = useGameStore((s) => s.comboMultiplier)
+  const bloomEnabled = useGameStore((s) => s.bloomEnabled)
 
   // Disable effects when not playing (perf)
   const enabled = gameState === 'playing' || gameState === 'paused' || gameState === 'gameover'
@@ -22,13 +23,15 @@ export function PostFX() {
 
   return (
     <EffectComposer multisampling={0}>
-      <Bloom
-        intensity={0.7}
-        luminanceThreshold={0.35}
-        luminanceSmoothing={0.9}
-        mipmapBlur
-        kernelSize={KernelSize.LARGE}
-      />
+      {bloomEnabled && (
+        <Bloom
+          intensity={0.7}
+          luminanceThreshold={0.35}
+          luminanceSmoothing={0.9}
+          mipmapBlur
+          kernelSize={KernelSize.LARGE}
+        />
+      )}
       <Vignette
         eskil={false}
         offset={0.2}
