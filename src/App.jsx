@@ -13,6 +13,7 @@ import { PlayerTrail } from './components/PlayerTrail'
 import { DamageNumbers } from './components/DamageNumbers'
 import { NearMissDetector } from './components/NearMissDetector'
 import { SmartBomb } from './components/SmartBomb'
+import { DamageVignette } from './components/DamageVignette'
 import { useGameStore } from './store'
 
 function CameraShake() {
@@ -146,6 +147,11 @@ export default function App() {
       if (window.__soundManager) window.__soundManager.playHit()
       if (window.__triggerCameraShake) window.__triggerCameraShake(0.4)
       if (window.__triggerScreenFlash) window.__triggerScreenFlash('#ff0000', 0.15)
+      if (window.__triggerDamageVignette) window.__triggerDamageVignette(0.6)
+      if (window.__triggerDamageNumber) {
+        const pos = useGameStore.getState().playerPosition
+        if (pos) window.__triggerDamageNumber(pos, `-${amount}`, '#ff4444')
+      }
     }
     return () => {
       unsub()

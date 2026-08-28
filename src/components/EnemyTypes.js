@@ -83,6 +83,32 @@ export const ENEMY_TYPES = {
     hitRadius: 0.5,
     visual: { kind: 'octahedron_small', color: '#ffff66', emissive: '#ffaa00', scale: 0.6 },
   },
+  mine: {
+    type: 'mine',
+    hp: 1,
+    baseSpeed: 0.7,
+    ai: 'slow_homing',
+    fireRate: 0,
+    projectileColor: null,
+    scoreValue: 40,
+    unlockWave: 4,
+    weightFn: (w) => Math.max(0, 0.15 + (w - 3) * 0.05),
+    hitRadius: 0.7,
+    visual: { kind: 'sphere_bumpy', color: '#ff0066', emissive: '#ff0044', scale: 0.8 },
+  },
+  diveBomber: {
+    type: 'diveBomber',
+    hp: 2,
+    baseSpeed: 0.5,
+    ai: 'dive',
+    fireRate: 0,
+    projectileColor: null,
+    scoreValue: 60,
+    unlockWave: 5,
+    weightFn: (w) => Math.max(0, 0.2 + (w - 4) * 0.05),
+    hitRadius: 0.9,
+    visual: { kind: 'cone', color: '#aa00ff', emissive: '#6600aa', scale: 1.1 },
+  },
 }
 
 /**
@@ -114,6 +140,10 @@ export function createEnemyGeometry(kind) {
       return new THREE.CylinderGeometry(0.5, 0.5, 1.0, 12)
     case 'cube':
       return new THREE.BoxGeometry(1.0, 1.0, 1.0)
+    case 'sphere_bumpy':
+      return new THREE.IcosahedronGeometry(0.5, 0)
+    case 'cone':
+      return new THREE.ConeGeometry(0.5, 1.2, 5)
     default:
       return new THREE.OctahedronGeometry(0.6, 0)
   }

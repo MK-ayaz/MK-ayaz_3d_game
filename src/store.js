@@ -102,7 +102,7 @@ const INITIAL_STATE = {
   // Selected ship type: 'fighter' | 'interceptor' | 'destroyer'
   shipType: 'fighter',
   // Smart bombs available
-  bombs: 1,
+  bombs: 0,
   // Stats tracking
   shotsFired: 0,
   shotsHit: 0,
@@ -230,6 +230,10 @@ export const useGameStore = create((set, get) => ({
   },
 
   takeDamage: (amount) => {
+    // Check invincibility frames
+    if (window.__playerInvincibleUntil && performance.now() < window.__playerInvincibleUntil) {
+      return
+    }
     const current = get().health - amount
     if (current <= 0) {
       set({ health: 0, gameState: 'gameover' })
@@ -273,8 +277,18 @@ export const useGameStore = create((set, get) => ({
       if (window.__soundManager) window.__soundManager.playAchievement()
     }
 
+    if (!achievements.includes('untouchable') && state.waveDamageTaken === 0 && newWave === 5) {
+      newUnlocked.push('untouchable')
+      achievements.push('untouchable')
+      saveAchievements(achievements)
+      if (window.__soundManager) window.__soundManager.playAchievement()
+    }
+
     // Heal player slightly on wave completion
     const healAmount = Math.min(20, state.maxHealth - state.health)
+
+    // Award bomb on every 3rd wave clear
+    const newBombs = newWave % 3 === 0 && newWave > 0 ? Math.min(3, state.bombs + 1) : state.bombs
 
     return {
       wave: newWave,
@@ -283,6 +297,7 @@ export const useGameStore = create((set, get) => ({
       waveDamageTaken: 0, // Reset damage counter for new wave
       health: Math.min(state.maxHealth, state.health + healAmount), // Small heal on wave completion
       pendingUpgrade: true, // Show upgrade screen overlay; game loop keeps running
+      bombs: newBombs,
     }
   }),
 
@@ -375,8 +390,39 @@ export const useGameStore = create((set, get) => ({
   setShipType: (type) => set({ shipType: type }),
 
   // Bombs
-  useBomb: () => set((state) => state.bombs > 0 ? { bombs: state.bombs - 1 } : {}),
+  useBomb: () => set((state) => {
+    if (state.bombs <= 0) return {}
+    const newUnlocked = [...state.unlockedAchievements]
+    const achievements = state.achievements
+    if (!achievements.includes('bomb_first')) {
+      newUnlocked.push('bomb_first')
+      achievements.push('bomb_first')
+      saveAchievements(achievements)
+      if (window.__soundManager) window.__soundManager.playAchievement?.()
+    }
+    return {
+      bombs: state.bombs - 1,
+      unlockedAchievements: newUnlocked,
+      achievements,
+    }
+  }),
   addBomb: (n = 1) => set((state) => ({ bombs: Math.min(3, state.bombs + n) })),
+
+  // Boss defeated
+  defeatBoss: () => set((state) => {
+    const newUnlocked = [...state.unlockedAchievements]
+    const achievements = state.achievements
+    if (!achievements.includes('boss_slayer')) {
+      newUnlocked.push('boss_slayer')
+      achievements.push('boss_slayer')
+      saveAchievements(achievements)
+      if (window.__soundManager) window.__soundManager.playAchievement?.()
+    }
+    return {
+      unlockedAchievements: newUnlocked,
+      achievements,
+    }
+  }),
 
   // Stats
   incShotsFired: () => set((state) => ({ shotsFired: state.shotsFired + 1 })),

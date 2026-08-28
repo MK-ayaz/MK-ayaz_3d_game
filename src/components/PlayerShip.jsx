@@ -233,20 +233,45 @@ export function PlayerShip({ isPlaying }) {
     <group ref={groupRef} position={[0, 0, PLAYER_Z]}>
       <ShipBody />
 
-      {/* Point light on ship */}
-      <pointLight position={[0, 0, 1]} intensity={1.5} color={lightColor} distance={10} />
+      {/* Strong point light on ship */}
+      <pointLight position={[0, 0, 1]} intensity={2.5} color={lightColor} distance={12} />
 
       {/* Bright glow ring under the player so they're always visible */}
       <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.7, 1.0, 32]} />
-        <meshBasicMaterial color={ringColor} transparent opacity={0.4} side={THREE.DoubleSide} depthWrite={false} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      {/* Inner ring */}
+      <mesh position={[0, -0.45, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.4, 0.55, 24]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.4} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       {/* Reticle / crosshair in front of player showing where bullets go */}
       <mesh position={[0, 0, -3]}>
-        <ringGeometry args={[0.3, 0.35, 16]} />
-        <meshBasicMaterial color={ringColor} transparent opacity={0.5} side={THREE.DoubleSide} depthWrite={false} />
+        <ringGeometry args={[0.4, 0.45, 16]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
+      {/* Crosshair cross */}
+      <mesh position={[-0.6, 0, -3]}>
+        <boxGeometry args={[0.4, 0.05, 0.05]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.5} depthWrite={false} />
+      </mesh>
+      <mesh position={[0.6, 0, -3]}>
+        <boxGeometry args={[0.4, 0.05, 0.05]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.5} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, 0.6, -3]}>
+        <boxGeometry args={[0.05, 0.4, 0.05]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.5} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, -0.6, -3]}>
+        <boxGeometry args={[0.05, 0.4, 0.05]} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.5} depthWrite={false} />
+      </mesh>
+
+      {/* Beacon — pulsing column of light above the ship */}
+      <pointLight position={[0, 2, 0]} intensity={0.5} color={lightColor} distance={6} />
 
       {/* Charge visual */}
       <ChargedShot />

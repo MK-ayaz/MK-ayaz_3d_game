@@ -34,7 +34,7 @@ function createAsteroidGeometry() {
 }
 const asteroidGeometries = Array.from({ length: 20 }, () => createAsteroidGeometry())
 const asteroidMaterial = new THREE.MeshStandardMaterial({
-  color: '#888888', roughness: 0.9, metalness: 0.1, flatShading: true,
+  color: '#aa8866', roughness: 0.85, metalness: 0.15, flatShading: true, emissive: '#221100', emissiveIntensity: 0.3,
 })
 
 // ─── Visual: Player bullet ───
@@ -278,6 +278,8 @@ export function GameEntities({ isPlaying }) {
           rotRef: { current: [0, 0, 0] },
           rotSpeed: enemyType === 'drone' ? [0, 3, 0] :
                     enemyType === 'sniper' ? [0, 0.5, 0] :
+                    enemyType === 'mine' ? [0.5, 0.5, 0.5] :
+                    enemyType === 'diveBomber' ? [0, 0, 0.5] :
                     [(Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2],
           geoIdx: -1,
           scale: baseScale,
@@ -288,6 +290,7 @@ export function GameEntities({ isPlaying }) {
           maxHp: cfg.hp,
           lastFire: now - Math.random() * cfg.fireRate, // stagger first shot
           lastHitTime: { current: 0 },
+          diving: false,
           active: true,
         })
       }
@@ -341,19 +344,30 @@ export function GameEntities({ isPlaying }) {
         // Enemy with type-based AI
         const cfg = ENEMY_TYPES[o.enemyType]
         if (cfg.ai === 'homing') {
-          // Accelerate toward player
-          const dx = playerPos[0] - o.posRef.current[0]
-          const dy = playerPos[1] - o.posRef.current[1]
-          const dz = playerPos[2] - o.posRef.current[2]
-          const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1
-          const homingStrength = 0.6
-          o.posRef.current[0] += (o.speed * dt * (dx / d)) * homingStrength + (o.speed * dt * 0.3) * (dx > 0 ? 1 : -1)
-          o.posRef.current[1] += (o.speed * dt * (dy / d)) * homingStrength + (o.speed * dt * 0.3) * (dy > 0 ? 1 : -1)
-          o.posRef.current[2] += (o.speed * dt * (dz / d)) * homingStrength + (o.speed * dt * 0.3) * (dz > 0 ? 1 : -1)
-          // Simplify: just lerp toward player
+          // Lerp toward player + forward thrust
           o.posRef.current[0] = o.posRef.current[0] + (playerPos[0] - o.posRef.current[0]) * 0.012
           o.posRef.current[1] = o.posRef.current[1] + (playerPos[1] - o.posRef.current[1]) * 0.012
           o.posRef.current[2] = o.posRef.current[2] + o.speed * dt
+        } else if (cfg.ai === 'slow_homing') {
+          // Mines: very slow, drift toward player
+          o.posRef.current[0] = o.posRef.current[0] + (playerPos[0] - o.posRef.current[0]) * 0.005
+          o.posRef.current[1] = o.posRef.current[1] + (playerPos[1] - o.posRef.current[1]) * 0.005
+          o.posRef.current[2] = o.posRef.current[2] + o.speed * dt
+          // Spinning visual handled in EnemyMesh
+        } else if (cfg.ai === 'dive') {
+          // Dive bomber: drifts forward, then when close, dives at player
+          if (o.posRef.current[2] > -10 && !o.diving) {
+            // Cruising phase
+            o.posRef.current[2] += o.speed * dt
+          } else {
+            // Diving phase
+            o.diving = true
+            const dx = playerPos[0] - o.posRef.current[0]
+            const dy = playerPos[1] - o.posRef.current[1]
+            o.posRef.current[0] += dx * 0.04
+            o.posRef.current[1] += dy * 0.04
+            o.posRef.current[2] += o.speed * dt * 3
+          }
         } else if (cfg.ai === 'stationary') {
           // Don't move on x/y; only z forward
           o.posRef.current[2] += o.speed * dt
@@ -391,6 +405,7 @@ export function GameEntities({ isPlaying }) {
         o.active = false
         if (!store.pendingUpgrade) {
           store.takeDamage(o.type === 'asteroid' ? 15 : 20)
+          if (window.__triggerDamageVignette) window.__triggerDamageVignette(0.4)
         }
         obstaclesChanged = true
         if (window.__soundManager) window.__soundManager.playHit()
@@ -454,6 +469,7 @@ export function GameEntities({ isPlaying }) {
                                     (cfg?.visual?.emissive || '#ff4444')
               window.__triggerExplosion(o.posRef.current, explosionColor, 25)
             }
+            if (window.__triggerCameraShake) window.__triggerCameraShake(0.2)
             if (window.__soundManager) window.__soundManager.playExplosion()
 
             if (store.comboMultiplier >= 3 && window.__triggerScreenFlash) {
@@ -507,6 +523,7 @@ export function GameEntities({ isPlaying }) {
     bossStateRef.current.active = false
     bossStateRef.current.defeated = true
     useGameStore.getState().addScore(500)
+    useGameStore.getState().defeatBoss?.()
     useGameStore.getState().setBossActive(false)
     setBossKey((k) => k + 1)
     if (window.__triggerExplosion) {
