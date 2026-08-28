@@ -338,6 +338,10 @@ export const useGameStore = create((set, get) => ({
     if (type === 'blackhole') {
       window.__spawnBlackHole?.([...state.playerPosition])
     }
+    if (type === 'bomb') {
+      get().addBomb(1)
+      set({ activePowerUp: null, powerUpTimer: 0 }) // Bomb is instant
+    }
   },
 
   updatePowerUp: () => {
