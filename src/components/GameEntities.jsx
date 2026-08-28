@@ -404,8 +404,15 @@ export function GameEntities({ isPlaying }) {
       if (o.posRef.current[2] > 10) {
         o.active = false
         if (!store.pendingUpgrade) {
-          store.takeDamage(o.type === 'asteroid' ? 15 : 20)
-          if (window.__triggerDamageVignette) window.__triggerDamageVignette(0.4)
+          // Check invincibility
+          if (!window.__playerInvincibleUntil || performance.now() > window.__playerInvincibleUntil) {
+            store.takeDamage(o.type === 'asteroid' ? 15 : 20)
+            if (window.__triggerDamageVignette) window.__triggerDamageVignette(0.4)
+            if (window.__triggerDamageNumber) {
+              const pos = useGameStore.getState().playerPosition
+              if (pos) window.__triggerDamageNumber(pos, `-${o.type === 'asteroid' ? 15 : 20}`, '#ff4444')
+            }
+          }
         }
         obstaclesChanged = true
         if (window.__soundManager) window.__soundManager.playHit()

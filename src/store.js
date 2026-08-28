@@ -213,6 +213,7 @@ export const useGameStore = create((set, get) => ({
       unlockedAchievements: newUnlocked,
       achievements,
       totalKills: state.totalKills + 1,
+      totalScore: state.totalScore + points,
     }
   }),
 
@@ -240,6 +241,8 @@ export const useGameStore = create((set, get) => ({
     } else {
       set({ health: current, waveDamageTaken: get().waveDamageTaken + amount })
     }
+    // Grant brief invincibility after taking damage
+    window.__playerInvincibleUntil = performance.now() + 800
     // Reset combo on damage
     get().resetCombo()
   },

@@ -268,7 +268,7 @@ export function GameUI() {
         </div>
       )}
 
-      {/* Mute button (top right) */}
+      {/* Mute button (top right corner) */}
       {(gameState === 'playing' || gameState === 'paused') && (
         <button
           onClick={() => {
@@ -281,7 +281,7 @@ export function GameUI() {
           style={{
             position: 'absolute',
             top: 20,
-            right: 20,
+            right: 70,
             width: 40,
             height: 40,
             borderRadius: '50%',

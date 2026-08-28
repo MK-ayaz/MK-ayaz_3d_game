@@ -137,6 +137,7 @@ function Scene() {
 export default function App() {
   // Expose player position and hit handler globally so enemy projectiles can collide
   React.useEffect(() => {
+    window.__playerInvincibleUntil = 0
     const unsub = useGameStore.subscribe((state) => {
       window.__playerPos = state.playerPosition
     })
